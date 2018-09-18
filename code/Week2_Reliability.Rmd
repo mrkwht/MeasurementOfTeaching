@@ -44,12 +44,6 @@ Videot <- Videot %>% mutate(M= (PURP+INTC+RC+CPK+CPE+MOD+GP+ESI+CD+TBI+ALL+BMN+T
     - Even if you only have half-formed ideas, start a post with your thoughts
 - Website for demonstrations: https://github.com/mrkwht/MeasurementOfTeaching
 
-## Goal {.flexbox .vcenter}
-
-The purpose of these slides is to highlight the relationship between the definitions of constructs and views of reliability. We use PLATO scores from the UTQ study.
-
-We will estimate reliability statistics and pose the question, does this suggest PLATO is reliable?
-
 ## Protocol for Language Arts Teaching Observation
 
 - Modern Measure of Quality of Instruction in ELA lessons
@@ -62,6 +56,36 @@ We will estimate reliability statistics and pose the question, does this suggest
 - 228 Middle School ELA teachers with Video and Live Scoring
 - Six observers
 - Four videos per teacher with 2 segments per video
+
+## Empirical Setup
+
+- We observe $X$
+- Observation occurs on
+    - Given Teacher ($t$)
+    - Given Day ($d$)
+    - Given Segment ($s$)
+    - by Given Rater ($r$)
+    - Given Item ($i$)
+
+Thus, $X_{tdsri}$
+
+## Empirical Setup
+
+By classical test theory: $X=T+E$
+
+Reliability is $var(T)/var(X) = var(T)/(var(X)+var(E))$
+
+Different Reliability Estimates Specify Different Measurement Error Sources
+
+- Alpha - items
+- Inter-Rater Reliability - raters
+- ...
+
+## Empirical Setup
+
+Given Observed ($X_{tdsri}$) and Error Source ($E_i$) the True Score takes on a specific form ($T_{tdsr}$)
+
+Thus, each given reliability model implies a specific scope for the True Score. That is, the reliability model, by defining sources of error, specifies what is being measured.
 
 ## View of PLATO data {.smaller}
 
@@ -100,9 +124,12 @@ Videot %>% select(PURP, INTC, RC, CPK,
 
 </div>
 
-## What about rater error?
+## Alpha's Assumption on Error
 
-- Rater's score dimensions in different ways and may be more or less likely to score items reliably
+>- What is the source of error?
+>- What does the true score represent?
+>- Are Errors independent across raters?
+
 
 ## Rater Specific Alphas {.smaller}
 
@@ -113,7 +140,7 @@ Videot %>%
   {plyr::ldply(.)}
 ```
 
-## Inter-Rater Reliability
+## Inter-Rater Reliability (IRR)
 
 Simple Correlation Approach
 
@@ -139,6 +166,11 @@ Videot %>%
 ```
 
 
+## IRR's Assumption on Error
+
+>- What is the source of error?
+>- What does the true score represent?
+
 ## Inter-Lesson
 
 Simple Correlation Approach
@@ -157,6 +189,11 @@ Videot %>%
 - ICC Version: `r Videot %>% group_by(LessonID,SegID) %>% summarise(M=mean(M,na.rm=T)) %>% ungroup %>% {lme4::lmer(M~1+(1|LessonID),.)} %>% summary %>% {.$varcor} %>%     as.data.frame %>% summarise(IRR=vcov[2]/sum(vcov)) %>% unname`
 - Across Sections Version: `r Videot %>% group_by(TeacherID,SectionID) %>% summarise(M=mean(M,na.rm=T)) %>% group_by(TeacherID) %>% mutate(N=paste0("v",1:n())) %>% dcast(TeacherID~N,value.var="M") %>% select(v1,v2) %>% cor(use="pair") %>% {(.)[1,2]}`
 
+## Test-Retest Reliability's Assumption on Error
+
+>- What is the source of error?
+>- What does the true score represent?
+
 ## Generalizability Approach
 
 - Depends on Number of Days Observed and Raters Scoring Teachers
@@ -169,4 +206,7 @@ Videot %>%
 
 ## Limits on Generalizability Approach
 
-- What is the construct that the generalizability approach provides a reliability estimate for?
+>- What is the source of error?
+>- What does the true score represent?
+>- What errors are not captured?
+>    - Schools?

@@ -1,0 +1,48 @@
+---
+title: "IRR_Danielson"
+author: "MCW"
+date: "`r Sys.time()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+source("C:/Users/mrkwht/Dropbox/Research/R libraries/DefaultScriptMark.R")
+require(gdata)
+load(file=file.path("C:/Users/mrkwht/Documents/UTQ/UTQProject/data/FFT_Compiled.rData"))
+knitr::opts_chunk$set(echo = TRUE)
+dim(FFT)
+dim(FFT<-FFT[!(LessonID=="1225-105-M9C5-S1" & ScoreType=="Live"),])
+
+FFTtall=melt.data.table(FFT,id.vars=c("LessonID","SectionID","TeacherID","SchoolID","DistrictID","FFT_ObserverID","ScoreType","Subject","Grade"), measure.vars=matchcols(FFT,"[1-2]$",c("NumNotes","Just")))
+FFTwide<-dcast.data.table(FFTtall,LessonID+SectionID+TeacherID+SchoolID+DistrictID+Subject+Grade~variable+FFT_ObserverID)
+raters<-c("303","315","318","319","322","342","343","344","366","379","383","398")
+items  <-c("FFT_RR_1" ,"FFT_RR_2" ,
+          "FFT_CL_1" ,"FFT_CL_2" ,
+          "FFT_MCP_1","FFT_MCP_2",
+          "FFT_MSB_1","FFT_MSB_2",
+          "FFT_OPS_1","FFT_OPS_2",
+          "FFT_CS_1" ,"FFT_CS_2" ,
+          "FFT_KC_1" ,"FFT_KC_2" ,
+          "FFT_QDT_1","FFT_QDT_2",
+          "FFT_ESL_1","FFT_ESL_2",
+          "FFT_UAI_1","FFT_UAI_2",
+          "FFT_FR_1" ,"FFT_FR_2" )
+```
+
+
+```{r MCMC}
+# library(MCMCglmm)
+# prior = list(R = list(V = 1, n = 0, fix = 1), 
+#              G = list(G1 = list(V = 1, n = 1),
+#                       G2 = list(V = 1, n = 1),
+#                       G3 = list(V = 1, n = 1),
+#                       G4 = list(V = 1, n = 1),
+#                       G5 = list(V = 1, n = 1)))
+# set.seed(45)
+# MCMC <- MCMCglmm(profit ~ 1, random = ~year + farmer + place + gen + district,
+#     data = farmers, family = "categorical", prior = prior, verbose = FALSE)
+# summary(MCMC)
+# library(scapeMCMC)
+# plotTrace(MCMC$VCV, log = TRUE)
+```
+Check MCMCglmm and lmer variances and std. errors for generalizability study data

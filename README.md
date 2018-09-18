@@ -1,0 +1,1 @@
+This repository contains examples and demonstrations from the Measurement of Teaching (EDUC737) class at the University of Michigan, which was taught in Fall of 2018.  All demonstrations are in R-Markdown files and contain compiled html slidy presentations, along with original code files. (c) Mark White

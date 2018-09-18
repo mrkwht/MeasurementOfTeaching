@@ -1,0 +1,433 @@
+---
+title       : Inter-Rater Reliability
+subtitle    : 
+date        : "`r Sys.time()`"
+author      : Mark White
+job         : 
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+widgets     : [mathjax]     # {quiz, bootstrap}
+mode        : standalone # {selfcontained, draft}
+knit        : slidify::knit2slides
+---
+
+```{r setup, include=F}
+require(slidify)
+# setwd("r/IRR")
+# rm(list=ls())
+source("../../../../Research/R libraries/DefaultScriptMark.R")
+require(ggplot2)
+require(data.table)
+require(lme4)
+require(gdata)
+require(ordinal)
+require(plyr)
+require(xtable)
+options(digits=2)
+options(xtable.type="html",xtable.include.rownames=F)
+knitr::opts_chunk$set(echo = F)
+
+
+raters<-c("303","315","318","319","322","342","343","344","366","379","383","398")
+items  <-c("FFT_RR_1","FFT_CL_1","FFT_MCP_1","FFT_MSB_1","FFT_OPS_1","FFT_CS_1" ,"FFT_KC_1" ,"FFT_QDT_1","FFT_ESL_1","FFT_UAI_1","FFT_FR_1" )
+```
+```{r restructure, include=F,cache=T}
+load(file=file.path("C:/Users/mrkwht/Documents/UTQ/UTQProject/data/Compiled_ObsData.rData"))
+
+Video[,matchcols(Video,c("MQI|CLASS|IDAP|Sec|PreObsQSummary|PLATO"),c("DOMAIN","STRUCT","READ","SectionID")):=NULL]
+Video[,c(matchcols(Video,"TKAS|CameraFile|Just"),"ObsPatt","WorkingNotes"):=NULL]
+dim(FFT <- Video[,.SD,.SDcols=c("SectionID","TeacherID","SchoolID","LessonID","DistrictID","ScoreType","ScoreSessionID","Subject","Grade","FFT_ObserverID","FFT_StartTime","FFT_NoteEndTime","FFT_EndTime","FFT_TimestampRevised","FFT_RR_1","FFT_CL_1","FFT_MCP_1","FFT_MSB_1","FFT_OPS_1","FFT_CS_1","FFT_KC_1","FFT_QDT_1","FFT_ESL_1","FFT_UAI_1","FFT_FR_1","PLATO_DOMAIN_Read_1","PLATO_DOMAIN_Read_2","PLATO_DOMAIN_Writ_1","PLATO_DOMAIN_Writ_2","PLATO_DOMAIN_Lit_1","PLATO_DOMAIN_Lit_2","PLATO_DOMAIN_Oral_1","PLATO_DOMAIN_Oral_2","PLATO_DOMAIN_Vocab_1","PLATO_DOMAIN_Vocab_2","PLATO_DOMAIN_Grammar_1","PLATO_DOMAIN_Grammar_2","PLATO_DOMAIN_Research_1","PLATO_DOMAIN_Research_2","PLATO_STRUCT_Tlecture_1","PLATO_STRUCT_Tlecture_2","PLATO_STRUCT_ShortSResp_1","PLATO_STRUCT_ShortSResp_2","PLATO_STRUCT_SmGrpUnstr_1","PLATO_STRUCT_SmGrpUnstr_2","PLATO_STRUCT_SmGrpStr_1","PLATO_STRUCT_SmGrpStr_2","PLATO_STRUCT_WholeGrp_1","PLATO_STRUCT_WholeGrp_2","PLATO_STRUCT_StdPres_1","PLATO_STRUCT_StdPres_2","PLATO_STRUCT_IndpWork_1","PLATO_STRUCT_IndpWork_2","PLATO_STRUCT_UseSPrLang_1","PLATO_STRUCT_UseSPrLang_2","PLATO_STRUCT_Differentiated_1","PLATO_STRUCT_Differentiated_2","PLATO_READ_Independent_1","PLATO_READ_Independent_2","PLATO_READ_Timed_1","PLATO_READ_Timed_2","PLATO_READ_Whole_1","PLATO_READ_Whole_2","PLATO_READ_Small_1","PLATO_READ_Small_2","Semester","ObsDate","ObsTime","CAM_TViewNoAudio","CAM_SViewNoAudio","CAM_VideoQuality","CAM_Adults","QC_TVIEW_VID_CLARITY","QC_TVIEW_VID_OPERATION","QC_TVIEW_TAUDIO","QC_TVIEW_SAUDIO","QC_SVIEW_VID_CLARITY","QC_SVIEW_VID_OPERATION","QC_SVIEW_TAUDIO","QC_SVIEW_SAUDIO","QC_SYNC","QC_SUMMARY_SCORE","CameraOperator","ClassLength","TCH_GENDER","TCH_RACE","TCH_YRS_MID","TCH_SUB_K12","TCH_ALT_CERT","TCH_TEAM_TCH","TCH_INTELL_CNTCHG","TCH_INTELL_AMT","TCH_INTELL_LRN_NEW","TCH_INTELL_CHG_LOT","TCH_INTELL_CNCHG","TCH_INTELL_CHG_AMT","VAM_T_Reg6","VAM_T_Reg6_AltYr","NumSt" )])
+dim(FFT<-FFT[ScoreType!="Live",])
+
+FFT[,VidQuality:=apply(data.frame(QC_TVIEW_VID_CLARITY,QC_TVIEW_VID_OPERATION,QC_SVIEW_VID_CLARITY,QC_SVIEW_VID_OPERATION),1,mean,na.rm=T)]
+FFT[,c("QC_TVIEW_VID_CLARITY","QC_TVIEW_VID_OPERATION","QC_SVIEW_VID_CLARITY","QC_SVIEW_VID_OPERATION"):=NULL]
+
+FFT[,PLATO_DOMAIN_Read          :=(PLATO_DOMAIN_Read_1          +PLATO_DOMAIN_Read_2          )/2]
+FFT[,PLATO_DOMAIN_Writ          :=(PLATO_DOMAIN_Writ_1          +PLATO_DOMAIN_Writ_2          )/2]
+FFT[,PLATO_DOMAIN_Lit           :=(PLATO_DOMAIN_Lit_1           +PLATO_DOMAIN_Lit_2           )/2]
+FFT[,PLATO_DOMAIN_Oral          :=(PLATO_DOMAIN_Oral_1          +PLATO_DOMAIN_Oral_2          )/2]
+FFT[,PLATO_DOMAIN_Vocab         :=(PLATO_DOMAIN_Vocab_1         +PLATO_DOMAIN_Vocab_2         )/2]
+FFT[,PLATO_DOMAIN_Grammar       :=(PLATO_DOMAIN_Grammar_1       +PLATO_DOMAIN_Grammar_2       )/2]
+FFT[,PLATO_DOMAIN_Research      :=(PLATO_DOMAIN_Research_1      +PLATO_DOMAIN_Research_2      )/2]
+FFT[,PLATO_STRUCT_Tlecture      :=(PLATO_STRUCT_Tlecture_1      +PLATO_STRUCT_Tlecture_2      )/2]
+FFT[,PLATO_STRUCT_ShortSResp    :=(PLATO_STRUCT_ShortSResp_1    +PLATO_STRUCT_ShortSResp_2    )/2]
+FFT[,PLATO_STRUCT_SmGrpUnstr    :=(PLATO_STRUCT_SmGrpUnstr_1    +PLATO_STRUCT_SmGrpUnstr_2    )/2]
+FFT[,PLATO_STRUCT_SmGrpStr      :=(PLATO_STRUCT_SmGrpStr_1      +PLATO_STRUCT_SmGrpStr_2      )/2]
+FFT[,PLATO_STRUCT_WholeGrp      :=(PLATO_STRUCT_WholeGrp_1      +PLATO_STRUCT_WholeGrp_2      )/2]
+FFT[,PLATO_STRUCT_StdPres       :=(PLATO_STRUCT_StdPres_1       +PLATO_STRUCT_StdPres_2       )/2]
+FFT[,PLATO_STRUCT_IndpWork      :=(PLATO_STRUCT_IndpWork_1      +PLATO_STRUCT_IndpWork_2      )/2]
+FFT[,PLATO_STRUCT_UseSPrLang    :=(PLATO_STRUCT_UseSPrLang_1    +PLATO_STRUCT_UseSPrLang_2    )/2]
+FFT[,PLATO_STRUCT_Differentiated:=(PLATO_STRUCT_Differentiated_1+PLATO_STRUCT_Differentiated_2)/2]
+FFT[,PLATO_READ_Independent     :=(PLATO_READ_Independent_1     +PLATO_READ_Independent_2     )/2]
+FFT[,PLATO_READ_Timed           :=(PLATO_READ_Timed_1           +PLATO_READ_Timed_2           )/2]
+FFT[,PLATO_READ_Whole           :=(PLATO_READ_Whole_1           +PLATO_READ_Whole_2           )/2]
+FFT[,PLATO_READ_Small           :=(PLATO_READ_Small_1           +PLATO_READ_Small_2           )/2]
+FFT[,c("PLATO_DOMAIN_Read_1","PLATO_DOMAIN_Read_2","PLATO_DOMAIN_Writ_1","PLATO_DOMAIN_Writ_2","PLATO_DOMAIN_Lit_1","PLATO_DOMAIN_Lit_2","PLATO_DOMAIN_Oral_1","PLATO_DOMAIN_Oral_2","PLATO_DOMAIN_Vocab_1","PLATO_DOMAIN_Vocab_2","PLATO_DOMAIN_Grammar_1","PLATO_DOMAIN_Grammar_2","PLATO_DOMAIN_Research_1","PLATO_DOMAIN_Research_2","PLATO_STRUCT_Tlecture_1","PLATO_STRUCT_Tlecture_2","PLATO_STRUCT_ShortSResp_1","PLATO_STRUCT_ShortSResp_2","PLATO_STRUCT_SmGrpUnstr_1","PLATO_STRUCT_SmGrpUnstr_2","PLATO_STRUCT_SmGrpStr_1","PLATO_STRUCT_SmGrpStr_2","PLATO_STRUCT_WholeGrp_1","PLATO_STRUCT_WholeGrp_2","PLATO_STRUCT_StdPres_1","PLATO_STRUCT_StdPres_2","PLATO_STRUCT_IndpWork_1","PLATO_STRUCT_IndpWork_2","PLATO_STRUCT_UseSPrLang_1","PLATO_STRUCT_UseSPrLang_2","PLATO_STRUCT_Differentiated_1","PLATO_STRUCT_Differentiated_2","PLATO_READ_Independent_1","PLATO_READ_Independent_2","PLATO_READ_Timed_1","PLATO_READ_Timed_2","PLATO_READ_Whole_1","PLATO_READ_Whole_2","PLATO_READ_Small_1","PLATO_READ_Small_2"):=NULL]
+FFT[,TCH_INTELL:=apply(.SD,1,mean,na.rm=T),.SDcols=matchcols(FFT,"TCH_INTELL")]
+FFT[,matchcols(FFT,"TCH_INTELL_"):=NULL]
+
+FFT[,matchcols(FFT,"PLATO"):=lapply(.SD,function(x) mean(unique(na.omit(x)))),by=LessonID,.SDcols=matchcols(FFT,"PLATO")]
+
+dim(FFT<-FFT[!is.na(FFT_ObserverID),])
+DoubleLesson <-FFT[ScoreType=="Double",unique(LessonID)]
+dim(FFT<-FFT[LessonID %in% DoubleLesson,])
+
+FFTtall=melt.data.table(FFT,measure.vars=matchcols(FFT,"1$",c("NumNotes","Just")))
+FFTtall[,variable:=factor(sub("FFT_","",sub("_1","",char(variable))))]
+FFTwide<-dcast.data.table(FFTtall,LessonID+SectionID+TeacherID+SchoolID+DistrictID+Subject+Grade~variable+FFT_ObserverID)
+FFTtall[,valueM:=mean(value),by=c("LessonID","variable")]
+```
+
+## Inter-Rater Reliability/Agreement
+<br> <br>
+- Goal of measurement is to capture construct
+- Specific rater is rarely part of context
+- Two questions arise
+  - Are measurements accurately capturing construct?
+  - How much error is being introduced by raters?
+- <http://www.john-uebersax.com/stat/agree.htm>
+
+---
+## Different Types of Inter-Rater Reliability
+<br> <br>
+- Agreement versus Reliability
+- True score available or not
+
+--- &twocol
+## Which Scenario has Better Raters?
+
+***=left
+<br> <br>
+<div style="text-align:center;width:100%">
+<table style="width:50%;margin-left:auto;margin-right:auto">
+  <tr>
+    <th></th> <th></th> <th colspan="2">Rater 1</th>
+  </tr>
+  <tr> <td rowspan="3">Rater 2</td> 
+       <td> </td> <td><b>0</b></td> <td><b>1</b></td> </tr>
+  <tr> <td>0</td> <td>40</td> <td>10</td> </tr>
+  <tr> <td>1</td> <td>10</td> <td>40</td> </tr>
+</table>
+</div>
+
+<br> <br>
+<div style="text-align:center;width:100%">
+<table style="width:50%;margin-left:auto;margin-right:auto">
+  <tr>
+    <th></th> <th></th> <th colspan="2">Rater 1</th>
+  </tr>
+  <tr> <td rowspan="3">Rater 2</td> 
+       <td> </td> <td><b>0</b></td> <td><b>1</b></td> </tr>
+  <tr> <td>0</td> <td>40</td> <td>20</td> </tr>
+  <tr> <td>1</td> <td>0</td> <td>40</td> </tr>
+</table>
+</div>
+
+***=right
+<br> <br>
+<div style="text-align:center;width:100%">
+<table style="width:50%;margin-left:auto;margin-right:auto">
+  <tr>
+    <th></th> <th></th> <th colspan="2">Rater 1</th>
+  </tr>
+  <tr> <td rowspan="3">Rater 2</td> 
+       <td> </td> <td><b>0</b></td> <td><b>1</b></td> </tr>
+  <tr> <td>0</td> <td>5</td> <td>10</td> </tr>
+  <tr> <td>1</td> <td>10</td> <td>75</td> </tr>
+</table>
+</div>
+
+<br> <br>
+<div style="text-align:center;width:100%">
+<table style="width:50%;margin-left:auto;margin-right:auto">
+  <tr>
+    <th></th> <th></th> <th colspan="2">Rater 1</th>
+  </tr>
+  <tr> <td rowspan="3">Rater 2</td> 
+       <td> </td> <td><b>0</b></td> <td><b>1</b></td> </tr>
+  <tr> <td>0</td> <td>5</td> <td>18</td> </tr>
+  <tr> <td>1</td> <td>2</td> <td>75</td> </tr>
+</table>
+</div>
+
+---
+## Chance Corrected Agreement
+<br>
+- Raters may be correct simply due to chance
+- The distribution of scores will affect chance agreement
+- How to adjust percent agreement for guessing
+  - Kappa
+  - Ordinal Kappa
+  - PABAK
+
+--- &twocol
+##  Kappa 
+
+***=left
+- Assume Guessing Distribution Matches Observed Scores
+- Assume Scoring Independent
+- $P(R_1\bigcap R_2=1)= (b+d) * (c+d)$
+- $P(R_1\bigcap R_2=0)= (a+c) * (a+b)$
+- $P_C(R_1=R_2 by Chance)=$   
+      $\quad P(R_1\bigcap R_2=1)+P(R_1\bigcap R_2=0)$
+- $P_O=a+d$
+- $Kappa= \frac{P_O-P_C}{1-P_C}$
+
+***=right
+<br> <br>
+<div style="text-align:center;width:100%">
+<table style="width:50%;margin-left:auto;margin-right:auto">
+  <tr>
+    <th></th> <th></th> <th colspan="2">Rater 1</th>
+  </tr>
+  <tr> <td rowspan="3">Rater 2</td> 
+       <td> </td> <td><b>0</b></td> <td><b>1</b></td> </tr>
+  <tr> <td>0</td> <td>a</td> <td>b</td> </tr>
+  <tr> <td>1</td> <td>c</td> <td>d</td> </tr>
+</table>
+</div>
+
+---
+##  Kappa 
+<br>
+- Prevalence - distribution of event in sample
+- Bias - Rater disagreement over prevalence
+- Both still impact scores 
+  - Implies Kappa is sample dependent
+- Interpretation is not clear
+- Many suggest not using standard rules of thumb
+
+***=footnotes
+Cicchetti & Feinstein. (1990). High Agreement but Low Kappa: Resolving the Paradoxes. Journal of Clinical Epidemiology
+
+--- .compact
+##  Kappa Extensions
+
+- Weighted Kappa - for ordinal/interval data
+  - Weights disagreement based on distance between rated values
+  - Choice of weights is arbitrary
+- Scott's PI (Intraclass Kappa)
+  - Uses overall distribution for guessing parameter
+  - Can be used as multi-rater Kappa
+- Prevalence and Bias Adjusted Kappa (PABAK)
+  - $(k*P_O-1)/(k-1)$
+  - Assumes away prevalence and bias problems
+- Krippendorf Alpha
+  - Alternative that generalizes to ICC
+  - Multi-rater, nominal/ordinal/interval measures
+  - Unbalanced designs
+
+---
+##  Theoretical Issues: Kappa
+<br>
+- Kappa is better than simple percent agreement, but 
+  - picks arbitrary way of adjusting for chance
+    - Raters likely do not always guess based on marginal frequency
+  - Prevalence and Bias still raise issues and cause paradoxes
+
+--- &twocol
+## Specific Agreement
+
+***=left
+- Generalization of Specificity Sensitivity
+  - http://www.john-uebersax.com/stat/agree.htm
+  - Cicchetti & Feinstein (1990)
+- Represents Ratings with 1 value per outcome possibility
+  - $P(R_1=R_2|R_1 or R_2=1)=\frac{d+d}{(b+d)+(c+d)}$
+  - $P(R_1=R_2|R_1 or R_2=0)=\frac{a+a}{(b+a)+(c+a)}$
+
+***=right
+<br> <br>
+<div style="text-align:center;width:100%">
+<table style="width:50%;margin-left:auto;margin-right:auto">
+  <tr>
+    <th></th> <th></th> <th colspan="2">Rater 1</th>
+  </tr>
+  <tr> <td rowspan="3">Rater 2</td> 
+       <td> </td> <td><b>0</b></td> <td><b>1</b></td> </tr>
+  <tr> <td>0</td> <td>a</td> <td>b</td> </tr>
+  <tr> <td>1</td> <td>c</td> <td>d</td> </tr>
+</table>
+</div>
+
+---
+## Inter-Rater Reliability
+<br>
+- Correlation
+- Polychoric Correlation
+- ICC
+- G Theory
+
+---
+## Intra-Class Correlation 
+- $\sigma_i^2$ item RE, $\sigma_r^2$ rater RE, $\sigma_e^2$ residual error
+- ICC(1) - $\sigma_i^2/(\sigma_i^2+\sigma_e^2)$
+  - Raters nested in Items
+- Random Rater:
+  - ICC(C,1) - $\sigma_i^2/(\sigma_i^2+\sigma_{ir}^2+\sigma_e^2)$
+  - ICC(A,1) - $\sigma_i^2/(\sigma_i^2+\sigma_r^2+\sigma_{ir}^2+\sigma_e^2)$
+  - ICC(C,k) - $\sigma_i^2/(\sigma_i^2+\sigma_{ir}^2/k+\sigma_e^2/k)$
+- Fixed Rater: 
+  - ICC(C,1) - $(\sigma_i^2+\sigma_{ir}^2/(k-1))/(\sigma_i^2+\sigma_{ir}^2+\sigma_e^2)$
+  - ICC(A,1) - $(\sigma_i^2+\sigma_{ir}^2/(k-1))/(\sigma_i^2+\sigma_r^2+\sigma_{ir}^2+\sigma_e^2)$
+  - ICC(C,k) - $(\sigma_i^2+\sigma_{ir}^2/(k-1))/(\sigma_i^2+\sigma_{ir}^2/k+\sigma_e^2/k)$
+
+***=footnotes
+McGraw & Wong. (1996). Forming inferences about some intraclass correlation coefficients. Psychological methods.
+
+---
+## G Theory
+<br>
+- Estimates all variance components 
+- Allows combination of variance components into various ICC measures
+
+---
+## Examples from FFT in UTQ
+```{r echo=F,results="asis"}
+print(xtable(dcast.data.table(FFTtall,LessonID+variable~ScoreType,value.var="FFT_ObserverID")[variable=="RR",table(Regular,Double)]),include.rownames=T)
+```
+
+---
+## Examples from FFT in UTQ
+
+```{r include=F, cache=T}
+gt<-list()
+for (i in unique(FFTtall$variable))
+  gt[[i]] <- lmer(value~1+(1|LessonID)+(1|FFT_ObserverID),FFTtall,subset=variable==i)
+VarPer <- function(x) { 
+  x <- summary(x)$varcor
+  out <- c(unlist(x),Res=attr(x,"sc")^2)
+  round(out / sum(out)*100,1)
+}
+gtpct<-t(sapply(gt,VarPer))
+gtpct<-data.frame(variable=rownames(gtpct),gtpct)
+
+
+MabsD<-FFTtall[,mean(abs(value-valueM)),by=c("FFT_ObserverID","variable")][,xtabs(V1~FFT_ObserverID+ variable)]
+RMSE <-FFTtall[,sd(value-valueM),by=c("FFT_ObserverID","variable")][,xtabs(V1~FFT_ObserverID+ variable)]
+
+kappa.pair   <- data.frame(variable=unique(FFTtall$variable),kappa.pair=sapply(unique(FFTtall$variable), function(x) mean(apply(combinat::combn(matchcols(FFTwide,x),2),2, function(y) { irr::kappa2(as.data.frame(FFTwide)[,y],weight = "squared")$value }),na.rm=T)))
+kappa.ignore <- dcast(FFTtall,LessonID+variable~ScoreType)[,data.frame(Kappa=irr::kappa2(data.frame(Regular,Double),weight="squared")$value),by=variable]
+
+ExpProb <- FFTtall[,sum(prop.table(base::table(value))^2),by=variable]
+ScottPi <- function(x,i) {
+  tab <- base::table(x)
+  n<-sum(tab)
+  agree<-sum(diag(tab))
+  Po <- agree/n
+  Pe <-ExpProb[variable==i,V1]
+  return( (Po-Pe)/(1-Pe) )
+}
+PABAK <- function(x) (4*sum(diag(prop.table(base::table(x))))-1)/3
+
+pabak<-dcast(FFTtall,LessonID+variable~ScoreType)[,PABAK(data.frame(Regular,Double)),by=variable]
+pi.pair   <- data.frame(variable=unique(FFTtall$variable),pi.pair=sapply(unique(FFTtall$variable), function(x) mean(apply(combinat::combn(matchcols(FFTwide,x),2),2, function(y) { ScottPi(as.data.frame(FFTwide)[,y],x) }),na.rm=T)))
+pi.ignore <- dcast(FFTtall,LessonID+variable~ScoreType)[,data.frame(pi=ScottPi(data.frame(Regular,Double),variable)),by=variable]
+
+ka <- data.frame(variable=unique(FFTtall$variable),alpha=sapply(unique(FFTtall$variable), function(x) irr::kripp.alpha(data.matrix(data.frame(FFTwide)[,matchcols(FFTwide,x)]),method="ordinal")$value))
+
+tab <- data.table(variable=names(apply(MabsD,2,mean)),
+             AbsD=apply(MabsD,2,mean),
+             RMSE=apply(RMSE,2,mean))
+names(pabak)<-c("variable","PABAK")
+tab<-merge(tab,merge(kappa.pair,kappa.ignore,by="variable",all=T),by="variable",all=T)
+tab<-merge(kappa.pair,kappa.ignore,by="variable",all=T)
+tab<-merge(tab,pabak,by="variable",all=T)
+tab<-merge(tab,pi.pair,by="variable",all=T)
+tab<-merge(tab,pi.ignore,by="variable",all=T)
+tab<-merge(tab,ka,by="variable",all=T)
+tab<-merge(tab,gtpct,by="variable",all=T)
+```
+```{r echo=F,results="asis"}
+addtorow <-list()
+addtorow$pos <- list(0)
+addtorow$command <- c(paste0("<col>",
+                             "<colgroup span='2'></colgroup>","<col>",
+                             "<colgroup span='2'></colgroup>","<col>",
+                             "<colgroup span='3'></colgroup>",
+                             "<tr>","<th rowspan='2' style='border-right:1pt solid black;vertical-align:middle'>Dimension</th>",
+                             "<th colspan='2' scope='colgroup' style='border-right:1pt solid black; text-align:center'>Kappa</th>",
+                             "<th rowspan='2' scope='col' style='border-right:1pt solid black;vertical-align:middle'>PABAK</th>",
+                             "<th colspan='2' scope='colgroup' style='border-right:1pt solid black;text-align:center'>Scott's Pi</th>",
+                             "<th  rowspan='2' scope='col' style='border-right:1pt solid black;text-align:center'>Kripp<br>Alpha</th>",
+                             "<th colspan='3' scope='colgroup' style='border-right:0;text-align:center'>Var. Decomposition</th>",
+                             "</tr>","<tr>",
+                             "<th scope='col' style='border-right:0'>Pairwise</th><th scope='col' style='border-right:1pt solid black'>Incorrect</th>",
+                             "<th scope='col' style='border-right:0'>Pairwise</th><th scope='col' style='border-right:1pt solid black'>Incorrect</th>",
+                             "<th scope='col' style='border-right:0'>Day</th><th scope='col' style='border-right:0'>Rater</th><th scope='col' style='border-right:0'>Day*Rater</th>",
+                             "</tr>",collapse=" "))
+
+print(xtable(tab[c(5,10,1,6,7,8,2,9,3,11,4),]),html.table.attributes="class='Example'",add.to.row=addtorow,include.colnames=F)
+
+```
+
+---
+## Implicit Assumptions Never Discussed
+<br>
+- Agreement is constant over full scale
+<br>
+- Agreement is constant over days
+
+---
+## Specific Agreement
+
+```{r echo=F,results="asis"}
+SpecAgree <- function(x,y) { 
+  tab<-base::table(factor(x,levels=1:4),factor(y,levels=1:4))
+  p1=2*tab[1,1]/sum(tab[1,],tab[,1])
+  p2=2*tab[2,2]/sum(tab[2,],tab[,2])
+  p3=2*tab[3,3]/sum(tab[3,],tab[,3])
+  p4=2*tab[4,4]/sum(tab[4,],tab[,4])
+  return(c(Agree=sprintf("%.0f%%", 100*sum(diag(prop.table(tab)))),
+           "1"=sprintf("%.0f%% (%.1f)",100*p1,100*sqrt(p1*(1-p1)/sum(tab[1,],tab[,1]))),
+           "2"=sprintf("%.0f%% (%.1f)",100*p2,100*sqrt(p2*(1-p2)/sum(tab[2,],tab[,2]))),
+           "3"=sprintf("%.0f%% (%.1f)",100*p3,100*sqrt(p3*(1-p3)/sum(tab[3,],tab[,3]))),
+           "4"=sprintf("%.0f%% (%.1f)",100*p4,100*sqrt(p4*(1-p4)/sum(tab[4,],tab[,4]))))) }
+sagree=data.frame(variable=unique(FFTtall$variable),ldply(unique(FFTtall$variable),function(x) dcast(FFTtall,LessonID+variable~ScoreType)[variable==x,SpecAgree(Regular,Double)]))
+sagree[c(1,3,4,9,10),"X4"]<-""
+#
+addtorow <-list()
+addtorow$pos <- list(0)
+addtorow$command <- c(paste0("<tr>","<th></th>","<th style='text-align:center;vertical-align:bottom'>Perc<br>Agree</th>",
+                             "<th style='text-align:center;vertical-align:bottom'>1</th><th style='text-align:center;vertical-align:bottom'>2</th>","<th style='text-align:center;vertical-align:bottom'>3</th><th style='text-align:center;vertical-align:bottom'>4</th>",
+                             "</tr>",collapse=" "))
+
+print(xtable(sagree[c(7,1:6,8:11),]),html.table.attributes="class='CT'",add.to.row=addtorow,include.colnames=F)
+
+```
+
+---
+## Are some lessons differentially hard to score?
+
+- Could find very limited evidence of rater error systematically relating to lesson characteristics
+- Strong negative relationship of disagreement and mean score on items
+  - especially RR, MSB, CS
+- Lessons given in May were harder to score for MSB and RR
+- 
+
+```{r diffdisagree, echo=F, include=F}
+
+FFTtall[,scorediff:=mean(abs(value-valueM),na.rm=T),by=c("LessonID","variable")]
+FFTtall[,cor(scorediff,valueM,use="pair"),by=variable]
+
+summary(FFTlesson <- FFTtall[,unique(.SD),.SDcols=c("SectionID","TeacherID","SchoolID","LessonID","DistrictID","Subject","Grade","Semester","ObsDate","ObsTime","CAM_TViewNoAudio","CAM_SViewNoAudio","CAM_VideoQuality","CAM_Adults","QC_TVIEW_TAUDIO","QC_TVIEW_SAUDIO","QC_SVIEW_TAUDIO","QC_SVIEW_SAUDIO","QC_SYNC","QC_SUMMARY_SCORE","CameraOperator","ClassLength","TCH_GENDER","TCH_RACE","TCH_YRS_MID","TCH_SUB_K12","TCH_ALT_CERT","TCH_TEAM_TCH","VAM_T_Reg6","VAM_T_Reg6_AltYr","NumSt","VidQuality","PLATO_DOMAIN_Read","PLATO_DOMAIN_Writ","PLATO_DOMAIN_Lit","PLATO_DOMAIN_Oral","PLATO_DOMAIN_Vocab","PLATO_DOMAIN_Grammar","PLATO_DOMAIN_Research","PLATO_STRUCT_Tlecture","PLATO_STRUCT_ShortSResp","PLATO_STRUCT_SmGrpUnstr","PLATO_STRUCT_SmGrpStr","PLATO_STRUCT_WholeGrp","PLATO_STRUCT_StdPres","PLATO_STRUCT_IndpWork","PLATO_STRUCT_UseSPrLang","PLATO_STRUCT_Differentiated","PLATO_READ_Independent","PLATO_READ_Timed","PLATO_READ_Whole","PLATO_READ_Small","TCH_INTELL","variable","scorediff")])
+FFTlesson<-dcast.data.table(FFTlesson,SectionID+TeacherID+SchoolID+LessonID+DistrictID+Subject+Grade+Semester+ObsDate+ObsTime+CAM_TViewNoAudio+CAM_SViewNoAudio+CAM_VideoQuality+CAM_Adults+QC_TVIEW_TAUDIO+QC_TVIEW_SAUDIO+QC_SVIEW_TAUDIO+QC_SVIEW_SAUDIO+QC_SYNC+QC_SUMMARY_SCORE+CameraOperator+ClassLength+TCH_GENDER+TCH_RACE+TCH_YRS_MID+TCH_SUB_K12+TCH_ALT_CERT+TCH_TEAM_TCH+VAM_T_Reg6+VAM_T_Reg6_AltYr+NumSt+VidQuality+PLATO_DOMAIN_Read+PLATO_DOMAIN_Writ+PLATO_DOMAIN_Lit+PLATO_DOMAIN_Oral+PLATO_DOMAIN_Vocab+PLATO_DOMAIN_Grammar+PLATO_DOMAIN_Research+PLATO_STRUCT_Tlecture+PLATO_STRUCT_ShortSResp+PLATO_STRUCT_SmGrpUnstr+PLATO_STRUCT_SmGrpStr+PLATO_STRUCT_WholeGrp+PLATO_STRUCT_StdPres+PLATO_STRUCT_IndpWork+PLATO_STRUCT_UseSPrLang+PLATO_STRUCT_Differentiated+PLATO_READ_Independent+PLATO_READ_Timed+PLATO_READ_Whole+PLATO_READ_Small+TCH_INTELL~variable,value.var="scorediff")
+
+# hist.rug(FFTlesson$scorediff)
+
+cor(FFTlesson[,c("PLATO_DOMAIN_Read","PLATO_DOMAIN_Writ","PLATO_DOMAIN_Lit","PLATO_DOMAIN_Oral","PLATO_DOMAIN_Vocab","PLATO_DOMAIN_Grammar","PLATO_DOMAIN_Research","PLATO_STRUCT_Tlecture","PLATO_STRUCT_ShortSResp","PLATO_STRUCT_SmGrpUnstr","PLATO_STRUCT_SmGrpStr","PLATO_STRUCT_WholeGrp","PLATO_STRUCT_StdPres","PLATO_STRUCT_IndpWork","PLATO_STRUCT_UseSPrLang","PLATO_STRUCT_Differentiated","PLATO_READ_Independent","PLATO_READ_Timed","PLATO_READ_Whole","PLATO_READ_Small"),with=F],FFTlesson[,c("CS","ESL","FR","KC","MCP","MSB","OPS","QDT","RR","CL","UAI"),with=F],use="pair")
+cor(FFTlesson[,c("CAM_TViewNoAudio","CAM_SViewNoAudio","CAM_VideoQuality","CAM_Adults","QC_TVIEW_TAUDIO","QC_TVIEW_SAUDIO","QC_SVIEW_TAUDIO","QC_SVIEW_SAUDIO","QC_SYNC","QC_SUMMARY_SCORE","VidQuality","TCH_INTELL"),with=F],FFTlesson[,c("CS","ESL","FR","KC","MCP","MSB","OPS","QDT","RR","CL","UAI"),with=F],use="pair")
+
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~Subject*Grade+Semester,FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~month(ObsDate)+chron::hours(ObsTime),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~factor(CameraOperator),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~cut(ClassLength,5),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~cut(TCH_YRS_MID,5),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~cut(TCH_SUB_K12,5),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~cut(NumSt,5),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~cut(VAM_T_Reg6,5),FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~TCH_GENDER+TCH_RACE+TCH_ALT_CERT,FFTlesson))
+anova(lm(cbind(CS,ESL,FR,KC,MCP,MSB,OPS,QDT,RR,CL,UAI)~factor(TCH_TEAM_TCH),FFTlesson))
+
+```

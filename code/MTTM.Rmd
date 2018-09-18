@@ -1,0 +1,176 @@
+---
+title: "Multi-Trait, Multi-Method Data Analysis Using Interactive HeatMaps"
+author: "Mark White"
+date: "March 14, 2016"
+output: 
+  html_document:
+    self_contained: true
+---
+
+
+```{r setup, include=FALSE, cache=F}
+require(gdata,quietly=T)
+require(lme4,quietly=T)
+require(lfe,quietly=T)
+require(d3heatmap,quietly=T)
+require(xtable,quietly=T)
+source("../../../Research/R libraries/DefaultScriptMark.R")
+knitr::opts_chunk$set(echo = TRUE,fig.width=6.5, fig.height=6.5,fig.align="center")
+
+load("../../../../Documents/UTQ/UTQProject/data/Compiled_ObsData.rData")
+Vars<-matchcols(Video,"[1-3]$",c("Finalized_In_Year1","^TCH","PreObsQ","NumNotes","MQI","Text","_Just_","Lit","WRITE","FOCUS","READ","TEXT","STRUCT","DOMAIN"))
+Vars=Vars[!grepl("FFT.*[2-3]$",Vars)]
+Video[,CLASS_NC_1:=8-CLASS_NC_1]
+Video[,CLASS_NC_2:=8-CLASS_NC_2]
+Video[,CLASS_NC_3:=8-CLASS_NC_3]
+suppressWarnings(
+Videotall<-melt.data.table(Video,id.vars=c("LessonID","SectionID","TeacherID","SchoolID","DistrictID","ScoreType","Subject","Grade","ObsDate","ObsTime","CLASS_StartTime","FFT_StartTime","PLATO_StartTime","CLASS_ObserverID","FFT_ObserverID","PLATO_ObserverID"),measure.vars=Vars)  )
+setnames(Videotall,"variable","ScoreName")
+Videotall<-Videotall[!is.na(value),] 
+        
+CLASS <- copy(Videotall[,.SD,.SDcols=c("LessonID","SectionID","TeacherID","SchoolID","DistrictID","ScoreType","Subject","Grade","ObsDate","ObsTime","CLASS_StartTime","CLASS_ObserverID","ScoreName","value")])
+PLATO <- copy(Videotall[,.SD,.SDcols=c("LessonID","SectionID","TeacherID","SchoolID","DistrictID","ScoreType","Subject","Grade","ObsDate","ObsTime","PLATO_StartTime","PLATO_ObserverID","ScoreName","value")])
+FFT <- copy(Videotall[,.SD,.SDcols=c("LessonID","SectionID","TeacherID","SchoolID","DistrictID","ScoreType","Subject","Grade","ObsDate","ObsTime","FFT_StartTime","FFT_ObserverID","ScoreName","value")])
+setnames(CLASS,c("CLASS_StartTime","CLASS_ObserverID"),c("StartTime","ObserverID")); CLASS$Instrument<-"CLASS"
+setnames(PLATO,c("PLATO_StartTime","PLATO_ObserverID"),c("StartTime","ObserverID")); PLATO$Instrument<-"PLATO"
+setnames(FFT  ,c("FFT_StartTime"  ,"FFT_ObserverID"  ),c("StartTime","ObserverID")); FFT$Instrument<-"FFT"
+CLASS<-CLASS[!is.na(ObserverID),]
+PLATO<-PLATO[!is.na(ObserverID),]
+FFT  <-FFT[  !is.na(ObserverID),]
+
+Videotall<-rbind(CLASS,PLATO,FFT)
+Videotall[,Instrument:=factor(Instrument)]
+summary(Videotall<-Videotall[!is.na(value),])
+rm(CLASS,PLATO,FFT); gc();
+```
+
+```{r LinearModel, cache=F, include=F}
+Mean<-function(x) base::mean(x,na.rm=T)
+modItem <- felm(value~1 | (ObserverID+ScoreName+ObserverID:ScoreName), data=as.data.frame(Videotall))
+
+VideoRes<-cbind(Videotall,ItemRes=as.vector(modItem$residuals))
+VideoBySegment <- dcast.data.table(VideoRes,LessonID~ScoreName,fun.aggregate=Mean,value.var="ItemRes")
+VideoRes[,ScoreName:=gsub("_[1-4]$","",ScoreName)]
+# VideoRes[,data.frame(value=Mean(value)),by=.(LessonID,ScoreName)]
+VideoByDim    <- dcast.data.table(VideoRes,LessonID~ScoreName,fun.aggregate=Mean,value.var="ItemRes")
+VideoByProt    <- dcast.data.table(VideoRes,LessonID~Instrument,fun.aggregate=Mean,value.var="ItemRes")
+```
+
+The graphs below use heatmaps to display the correlations between dimension scores across observation protocols.  Heatmaps provide a visual representation of a matrix by mapping numeric values to colors.  The graphs below show the correlation matrix between dimensions of observation protocols.  Dark blue cells (main diagonal) reprsent a correlation of 1 while Dark red cells show a correlation near zero (due to lack of negative correlations).  The dimensions are ordered by a hierarchical clustering process, the dendrograms of which are shown above and to the left of the graph.  Dimensions closer together are more related to each other.  The dendrogram shows larger groupings of variables.  **All estimates have been adjusted for rater by item leniency effects.**
+
+The graphs below are interactive. Hovering the mouse over a cell pulls up the correlation value for that cell, as well as column and row names.  Clicking on a cell and dragging over a range of cells zooms the graph into the highlighted cells, making the labels easier to see.  
+
+## Heatmap Based After Adjusting Rater by Item Effects
+```{r RaterByItem, echo=F}
+CORR <- cor(VideoBySegment[,-1,with=F],use="pairwise")
+d3heatmap(CORR,symm=T,scale="none",colors=rev(RColorBrewer::brewer.pal(11,"RdYlBu")))
+#xaxis_font_size = NULL
+```
+<center>Figure 1: Segment Level Correlations of Items. Scores adjusted for rater by item leniency</center>
+
+<br/>
+<br/>
+<br/>
+<br/>
+
+```{r RaterByDim, echo=F}
+CORR <- cor(VideoByDim[,-1,with=F],use="pairwise")
+d3heatmap(CORR,symm=T,scale="none",colors=rev(RColorBrewer::brewer.pal(11,"RdYlBu")))
+#xaxis_font_size = NULL
+```
+<center>Figure 2: Day Level Correlations of Items (averaged across segments). Scores adjusted for rater by item leniency</center>
+
+<br/>
+<br/>
+<br/>
+<br/>
+
+```{r RaterByProt, echo=F}
+CORR <- cor(VideoByProt[,-1,with=F],use="pairwise")
+d3heatmap(CORR,symm=T,scale="none",colors=rev(RColorBrewer::brewer.pal(11,"RdYlBu")))
+#xaxis_font_size = NULL
+```
+<center>Figure 3: Day Level Correlations of protocol Means Target of Analysis. Scores adjusted for rater by item leniency </center>
+
+<br/>
+<br/>
+<br/>
+<br/>
+
+```{r MTMM, echo=F}
+CLASS<-c("CLASS_PC","CLASS_TS","CLASS_RSP",
+         "CLASS_BM","CLASS_PD","CLASS_ILF","CLASS_NC",
+         "CLASS_CU","CLASS_APS","CLASS_QF",
+         "CLASS_ENG")
+FFT  <-c("FFT_FR","FFT_CL","FFT_MCP","FFT_MSB","FFT_OPS",
+         "FFT_CS","FFT_ESL","FFT_QDT","FFT_RR","FFT_UAI",
+         "FFT_KC")
+PLATO<-c("PLATO_ESI","PLATO_GP","PLATO_INTC","PLATO_MOD","PLATO_RC","PLATO_TBI",
+         "PLATO_CPK","PLATO_CPE","PLATO_CD","PLATO_ALL",
+         "PLATO_PURP","PLATO_BMN","PLATO_TMN")
+
+VarOrder=c("CLASS_BM","CLASS_PD","CLASS_NC",
+           "PLATO_BMN","PLATO_TMN",
+           "FFT_MSB","FFT_MCP","FFT_OPS",
+           
+           "CLASS_PC","CLASS_TS","CLASS_RSP",
+           "FFT_RR","FFT_FR","FFT_CL","FFT_CS",
+           "PLATO_CPE",
+           
+           "CLASS_ENG","FFT_ESL",
+           
+           "CLASS_ILF","CLASS_CU","CLASS_APS","CLASS_QF",
+           "FFT_QDT","FFT_UAI","FFT_KC",
+           "PLATO_ESI","PLATO_GP","PLATO_INTC","PLATO_MOD","PLATO_RC","PLATO_TBI","PLATO_CPK",
+           "PLATO_CD","PLATO_ALL","PLATO_PURP")
+CORR <- cor(VideoByDim[,VarOrder,with=F],use="pairwise")
+d3heatmap(CORR,symm=T,Rowv=F,Colv=F,scale="none",dendrogram="none")
+```
+<center>Figure 4: Day Level Correlations of Items (averaged across segments). Scores adjusted for rater by item leniency.  Same as Figure 2, but with management items first, then climate measures, then instructional measures (as opposed to empirical ordering) </center>
+
+
+
+## Appendix: Dimension Names
+
+```{r VariableNames, results="asis", echo=F}
+
+a <- matrix(c("CLASS_APS_1","CLASS","Analysis and Prob Solve",
+"CLASS_BM_1","CLASS","Beh. Manage",
+"CLASS_CU_1","CLASS","Content Understanding",
+"CLASS_ENG_1","CLASS","Engagement",
+"CLASS_ILF_1","CLASS","Instruction Learning Forma",
+"CLASS_NC_1","CLASS","Negative Climat",
+"CLASS_PC_1","CLASS","Positive Climat",
+"CLASS_PD_1","CLASS","Productivit",
+"CLASS_QF_1","CLASS","Qual. Feedbac",
+"CLASS_RSP_1","CLASS","Regard for Student Perspectiv",
+"CLASS_TS_1","CLASS","Teacher Sensitivit",
+"PLATO_ALL_1","PlATO","Accommodations for EL",
+"PLATO_BMN_1","PlATO","Behave Managemen",
+"PLATO_CD_1","PlATO","Class Discours",
+"PLATO_CPE_1","PlATO","Connect Persona",
+"PLATO_CPK_1","PlATO","Connect Prior Knowledg",
+"PLATO_ESI_1","PlATO","Explicit Instructio",
+"PLATO_GP_1","PlATO","Guided Practic",
+"PLATO_INTC_1","PlATO","Intellectual Chall",
+"PLATO_MOD_1","PlATO","Model",
+"PLATO_PURP_1","PlATO","Purpos",
+"PLATO_RC_1","PlATO","Represent Conten",
+"PLATO_TBI_1","PlATO","Text Based Instructio",
+"PLATO_TMN_1","PlATO","Time Managemen",
+"FFT_UAI_1","FFT","Assess Instruction",
+"FFT_MCP_1","FFT","Class Procedures",
+"FFT_CS_1","FFT","Comm. w/ Stud",
+"FFT_CL_1","FFT","Culture Learn",
+"FFT_ESL_1","FFT","Engag Student",
+"FFT_FR_1","FFT","Flex Response",
+"FFT_KC_1","FFT","Knowl Content",
+"FFT_OPS_1","FFT","Physical Space",
+"FFT_QDT_1","FFT","Quest. Discuss",
+"FFT_RR_1","FFT","Respect Rapport",
+"FFT_MSB_1","FFT","Stud Behavior" ),ncol=3,byrow=T)
+colnames(a) <- c("Var","Instrument","Dimension")
+print(xtable(a),type="html",include.rownames=F)
+
+
+```

@@ -200,7 +200,7 @@ Videot %>%
 
  ![](Figs/PlatoReliability.png)
  
- ## asdf
+## asdf
  
  <img src="Figs/PlatoReliability.png" alt="drawing" width="200"/>
 

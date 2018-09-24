@@ -1,0 +1,286 @@
+---
+title: 'Week 3: Classical Test Theory'
+author: "Mark White and Brian Rowan"
+date: "September 25, 2018"
+output: 
+  ioslides_presentation:
+     footer: "Copyright (c) 2018, Mark White"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+require(tidyverse)
+require(psych)
+require(GPArotation)
+require(reshape2)
+
+load(file.path("data","Teacher_Questionnaire.rData"))
+
+Teacher01 <- Teacher01 %>% 
+  select(respid, dstrctid,schoolid,dc_year,y1status,rsltdate, # intv,
+         tq1_10a,tq1_10b,tq1_10c,tq1_30a,tq1_30b,tq1_30c,tq1_48a,tq1_48d,tq1_48b,
+         InASP=tq1_46a, InAC=tq1_46b, InRnW=tq1_46c, InSFA=tq1_46d, InOther=tq1_46e) %>%
+  dplyr::rename(ELA_Exp="tq1_10a", ELA_Eff="tq1_10b", ELA_Value="tq1_10c",
+                Mth_Exp="tq1_30a", Mth_Eff="tq1_30b", Mth_Value="tq1_30c",
+                Prg_Exp="tq1_48b", Prg_Eff="tq1_48a", Prg_Value="tq1_48d")
+Teacher01 <- lapply(Teacher01, function(x) {
+  attr(x, "label") <- NULL
+  attr(x, "class") <- grep("labelled",attr(x,"class") ,invert=T,value=T)
+  x
+  } ) %>% as.data.frame
+rm(Teacher02,Teacher03,Teacher04)
+```
+
+
+## Today
+
+- Teacher Efficacy Discussion
+- Classical Test Theory Discussion
+- Discussing PLATO Video we Scored
+
+## Roadmap
+
+- Introduce SII and Efficacy Items
+- What is a True score?
+- What is Domain Sampling?
+- Overview of Classical Test Theory
+- Standard Errors of Measurement
+- Review of Reliability
+
+## Study for Instructional Improvement
+
+- Quasi-Experimental Study of 3 Comprehensive School Reform Programs
+- Using year 1 data
+- 1,994 teachers across 84 schools
+
+## Teacher Efficacy Items
+
+- ELA, Math and Program Specific
+- ELA and Math
+    - Most Students can learn what I am supposed to teach (*Expectancy*)
+    - By trying different methods, I can affect achievement (*Efficacy*)
+    - I feel satisfaction when students learn (*Value*)
+- Program
+    - I am capable of making changes called by by the program (*Efficacy*)
+    - The changes called for by the program help my students achieve (*Expectancy*)
+    - I value changes called for by program (*Value*)
+
+## Correlations
+
+```{r message=F, warning=F}
+qgraph::cor_auto(select(Teacher01, ELA_Exp,ELA_Eff,ELA_Value,Mth_Exp,Mth_Eff,Mth_Value,Prg_Exp,Prg_Eff,Prg_Value)) %>%
+{d3heatmap::d3heatmap(., Rowv=F, Colv=F, dendrogram="none")}
+```
+
+## What is a True Score?
+
+- Often we want to measure something, but cannot directly observe it
+    - e.g. teacher efficacy
+- A teacher's score on this 'latent' construct is the *true score*
+    - Theoretically postulated and assumed to exist
+    - Estimated with average score across items
+- We measure something influenced by latent construct and infer a true score on the latent construct
+
+## Domain Sampling
+
+<img src="Figs/BlankOutcome.png" alt="drawing" width="800" style="position:absolute;top:111px;align:middle"/>
+
+## Domain Sampling
+
+<img src="Figs/FullOutcome.png"  alt="drawing" width="800" style="position:absolute;top:111px;align:middle"/>
+
+## Classical Test Theory (CTT)
+
+Views Observed Test Score ($X_i$) as function of True Score ($T$) and Error ($E_i$) where $i$ here indicates items
+
+$$
+X_i=T+E_i
+$$
+
+Assumptions:
+
+- $E(X_i)=T$ and $E(E_i)=0$
+- $cor(E_i,T)=0$
+- $cor(E_i,E_j)=0$ for $i \neq j$
+- $var(E_i)=\sigma_E^2 \ \forall\ i$
+
+## Reliability Review
+
+<div style="font-size:18px">
+
+$$\begin{aligned} 
+X_i=&T+E_i \\ 
+cor(X_1,X_2) =& \frac{cov(T+E_1,T+E_2)}{\sqrt{var(X_1)*var(X_2)}} \\
+=& \frac{cov(T,T) + cov(T,E_2) + cov(T,E_1)+cov(E_1,E_2)}{\sqrt{var(X_1)*var(X_2)}} \\
+=& var(T)/var(X) \\
+\end{aligned}
+$$
+
+</div>
+
+- Reliability Types
+    - Alternate Forms
+    - Split Half
+    - Alpha (aka internal consistency reliability)
+        - not to be confused with internal consistency
+    - Test-Retest
+
+## Split-Half Reliability
+
+Generally worth discussing at this point because it led to spearman-brown prophesy formula
+
+$$
+r_{sh}=\frac{2*r_{12}}{1+r_{12}}
+$$
+
+where $r_{12}$ is correlation between to halves of test
+
+$$
+\frac{(n\ items)}{(n\ curr\ items)} = \frac{r_d(1-r_0)}{r_0(1-r_d)}
+$$
+
+where $r_d$ is desired reliability and $r_0$ is observed reliability
+
+## Cronbach's Alpha Reliability
+
+- Many equivalent interpretations
+    - Average of all Split-Half Reliabilities
+    - Correlation of two tests formed by random items
+    - Lower bound to reliability (if not prallel)
+- Many Formulas
+    - $\alpha=(m/(m-1))*(1-\sum_i\sigma^2_{X_i}/\sigma^2_X)$
+    - $\alpha=(m/(m-1))*(\sum_i\sigma_{X_i}/\sigma^2_X)$
+    - $\alpha=(m*\bar{r})/(1+(m-1)*\bar{r})$
+    - $\alpha\approx m*\bar{r}/\lambda_1$
+
+## Alpha in SII
+
+Overall Alpha
+
+```{r}
+psych::alpha(select(Teacher01,ELA_Exp,ELA_Eff,ELA_Value,Mth_Exp,Mth_Eff,Mth_Value,Prg_Exp,Prg_Eff,Prg_Value)) %>% .$total %>% .[c(1,2,4,7,8)]
+psych::alpha(select(Teacher01,ELA_Exp,ELA_Eff,ELA_Value,Mth_Exp,Mth_Eff,Mth_Value,Prg_Exp,Prg_Eff,Prg_Value)) %>% .$alpha.drop %>% .[,c(1,2,4,7,8)] %>% round(2)
+```
+
+## Alpha in SII
+
+ELA Alpha
+
+```{r}
+psych::alpha(select(Teacher01,ELA_Exp,ELA_Eff,ELA_Value)) %>% .$total %>% .[c(1,2,4,7,8)]
+```
+
+Math Alpha
+
+```{r}
+psych::alpha(select(Teacher01,Mth_Exp,Mth_Eff,Mth_Value)) %>% .$total %>% .[c(1,2,4,7,8)]
+```
+
+Program Alpha
+
+```{r}
+psych::alpha(select(Teacher01,Prg_Exp,Prg_Eff,Prg_Value)) %>% .$total %>% .[c(1,2,4,7,8)]
+```
+
+## Correlations across domains {.smaller}
+
+Standard
+
+```{r}
+tmp <- Teacher01 %>% mutate(ELA=(ELA_Exp+ELA_Eff+ELA_Value)/3,
+                     Math=(Mth_Exp+Mth_Eff+Mth_Value)/3,
+                     Prog=(Prg_Exp+Prg_Eff+Prg_Value)/3) %>%
+  select(ELA,Math,Prog) %>% cor(use="pair")
+tmp
+```
+Unattenuated
+
+```{r}
+alphas <- unlist(c(ELA =psych::alpha(select(Teacher01,ELA_Exp,ELA_Eff,ELA_Value)) %>% .$total %>% .["std.alpha"] %>% unname,
+                   Math=psych::alpha(select(Teacher01,Mth_Exp,Mth_Eff,Mth_Value)) %>% .$total %>% .["std.alpha"] %>% unname,
+                   Prog=psych::alpha(select(Teacher01,Prg_Exp,Prg_Eff,Prg_Value)) %>% .$total %>% .["std.alpha"] %>% unname) )
+sds<- Teacher01 %>% transmute(ELA=(ELA_Exp+ELA_Eff+ELA_Value)/3,
+                     Math=(Mth_Exp+Mth_Eff+Mth_Value)/3,
+                     Prog=(Prg_Exp+Prg_Eff+Prg_Value)/3) %>% apply(2,sd,na.rm=T)
+adj <- alphas %*% t(alphas)
+diag(adj) <- 1
+```
+
+- Assumes errors are uncorrelated
+- Alphas: `r paste(names(alphas),round(alphas,2),sep=": ")`
+- $\hat{r_{12}}= r_{12}/sqrt(\alpha_{1}*\alpha_{2})$
+
+```{r}
+tmp / sqrt(adj)
+```
+
+## Assumption: $cor(E_i,E_j)=0\ \forall\ i \neq j$ {.smaller}
+
+```{r warning=F, message=F}
+psych::omega(select(Teacher01,ELA_Exp,ELA_Eff,ELA_Value,Mth_Exp,Mth_Eff,Mth_Value,Prg_Exp,Prg_Eff,Prg_Value)) %>% invisible
+```
+
+## Assumption: $var(E_i)=\sigma_E^2 \ \forall\ i$
+
+```{r}
+tab <- fa(select(Teacher01,ELA_Exp,ELA_Eff,ELA_Value,Mth_Exp,Mth_Eff,Mth_Value,Prg_Exp,Prg_Eff,Prg_Value))[c("communality","loadings","uniquenesses")] 
+tab <- data.frame(loadings=unclass(tab["loadings"][[1]]), tab["communality"], tab["uniquenesses"])
+names(tab)[1] <- "Loadings"
+round(tab,2)
+```
+
+## Standard Error of Measurement ($se(\hat{T})$)
+
+$$SEM = \sigma_X * \sqrt(1-\alpha)$$
+
+- Alphas: `r paste(names(alphas),round(alphas,2),sep=": ")`
+- SD: `r paste(names(sds),round(sds,2),sep=": ")`
+- SEM: `r paste(names(sds),round(sds*sqrt(1-alphas),2),sep=": ")`
+
+
+## Expanded CTT -> Factor Analysis
+
+$X_i=T+E_i$ becomes $X_i=(\mu_i+\lambda_i*T^{\prime})+E_i$
+
+- Strictly Parallel becomes Parallel when:
+    - $\mu_i \neq 0\ \forall\ i$
+- Parallel becomes Tau-Equivalent when any of:
+    - $var(E_i)\neq var(E_j)$ for some $i\neq j$
+    - $var(X_i)\neq var(X_j)$ for some $i\neq j$
+- Tau-Equivalent becomes Congeric when:
+    - $\lambda_i \neq \lambda_j$ for some $i\neq j$
+- In all models:
+    - $E(E_i)=0$
+    - $cor(E_i,T)=0$
+    - $cor(E_i,E_j)=0$ for $i \neq j$
+
+
+## Expanded CTT
+
+- Item Response Theory
+    - $X_i=T+E_i$ becomes $X_i=logit(\mu_i+\lambda_i*T^')$
+    - SEM becomes person specific
+    - $\mu_i$ are interpreted as characteristics of items transferable across populations
+- Generalizability Theory
+    - $E_i$ becomes $E_i=\sum(E_f)_{f\in facet}$
+
+## Change in True Score Across Time {.smaller}
+
+$$\begin{align}
+X_{1i}=&T_1+E_{1i}\\
+X_{2i}=&T_2+E_{2i}\\
+X_{2i}-X_{1i}=&(T_2+E_{2i})- (T_1+E_{1i})\\
+=&(T_1+T_{\delta})- (T_1)+E_{2i}-E_{1i}\\
+=&T_{\delta}+E_{2i}-E_{1i}\\
+var(X_{2i}-X_{1i})=&var(T_{\delta})+var(E_{2i})-var(E_{1i})\\
+=&\sigma_{\delta}^2+2*\sigma_E^2\\
+\end{align}
+$$
+
+Note that 
+
+- Variance of the Error Doubles in Difference
+- Variance of $T_\delta$ is usually less than variance in $T$
+    - Hence, true score decreases
+- Thus, reliability decreases greatly when examining change in true score across time
+

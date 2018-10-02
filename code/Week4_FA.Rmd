@@ -19,8 +19,8 @@ require(psych)
 require(GPArotation)
 require(reshape2)
 
-source('../../Research/R libraries/DefaultScriptMark.R')
-load(file.path("data","Teacher_Questionnaire.rData"))
+source('../../../Research/R libraries/DefaultScriptMark.R')
+load(file.path("..","data","Teacher_Questionnaire.rData"))
 
 Teacher01 <- Teacher01 %>% 
   select(respid, dstrctid,schoolid,dc_year,y1status,rsltdate, # intv,
@@ -219,7 +219,7 @@ FA<-fa(qgraph::cor_auto(FactVars),
    nfactors=2,
    rotate="oblimin",
    fm="minres",
-   n.iter=5)
+   n.iter=5, scores=T)
 
 data.frame(`F~1~` =FA$cis$means[,"MR1"],
            `SE~1~`=FA$cis$sds[,"MR1"],
@@ -235,7 +235,34 @@ data.frame(`F~1~` =FA$cis$means[,"MR1"],
 
 <img src="Figs/FactorFull.png" alt="drawing" width="800" height="550" style="position:absolute;top:111px;align:middle"/>
 
+## Factor Scores {.smaller}
 
+```{r, echo=T}
+Scrs <- fa(FactVars,
+   nfactors=2,
+   rotate="oblimin",
+   fm="minres",
+   n.iter=5, scores="tenBerge")$scores
+describe(Scrs)
+cor(Scrs,use="pair")
+
+```
+
+## Factor Scores {.smaller}
+
+```{r, echo=T}
+F1<-0.57*Teacher01$ELA_Exp+
+  0.64*Teacher01$ELA_Eff+
+  0.57*Teacher01$ELA_Value+
+  0.65*Teacher01$Mth_Exp+
+  0.75*Teacher01$Mth_Eff+
+  0.60*Teacher01$Mth_Value
+F2 <- 0.92*Teacher01$Prg_Exp+
+  0.71*Teacher01$Prg_Eff+
+  0.85*Teacher01$Prg_Value
+
+cor(data.frame(Scrs,F1,F2),use="pair")
+```
 ## Change in True Score Across Time {.smaller}
 
 $$\begin{align}

@@ -10,6 +10,10 @@ output:
      
 ---
 
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 require(knitr)
@@ -112,18 +116,32 @@ $$
 
 <img src="Figs/FactorStructure.png" alt="drawing" width="800" height="500" style="position:absolute;top:111px;align:middle"/>
 
-## FA versus PCA  {.columns-2}
+## FA versus PCA  
 
+ <div class="row">
+  <div class="column">
+  
 Imagine we observe two highly correlated variables as shown to the right. What does PCA do?
 
-<img src="Figs/PCA1.png" alt="drawing" width="500" height="550"/>
+  </div>
+  <div class="column">
+    <img src="Figs/PCA1.png" alt="drawing" width="500" height="550"/>
+  </div>
+</div> 
 
 
-## FA versus PCA {.columns-2}
+## FA versus PCA 
+
+ <div class="row">
+  <div class="column">
 
 PCA simply tilts axes.  Instead of having axes X~1~ and X~2~, we get axes PCA~1~ and PCA~2~.  We can then choose to only use PCA~1~ to represent the data (with some loss of information).  There is no mathematical model, no way of determining fit to a model, and no characterization of the error of measurement.
 
-<img src="Figs/PCA2.png" alt="drawing" width="500" height="550"/>
+  </div>
+  <div class="column">
+    <img src="Figs/PCA2.png" alt="drawing" width="500" height="550"/>
+  </div>
+</div> 
 
 ## Number of Factors
 
@@ -237,20 +255,10 @@ data.frame(`F~1~` =FA$cis$means[,"MR1"],
 
 ## Factor Scores {.smaller}
 
-```{r, echo=T}
-Scrs <- fa(FactVars,
-   nfactors=2,
-   rotate="oblimin",
-   fm="minres",
-   n.iter=5, scores="tenBerge")$scores
-describe(Scrs)
-cor(Scrs,use="pair")
-
-```
-
-## Factor Scores {.smaller}
+Regression Score Estimates: 
 
 ```{r, echo=T}
+options(width=180)
 F1<-0.57*Teacher01$ELA_Exp+
   0.64*Teacher01$ELA_Eff+
   0.57*Teacher01$ELA_Value+
@@ -261,8 +269,67 @@ F2 <- 0.92*Teacher01$Prg_Exp+
   0.71*Teacher01$Prg_Eff+
   0.85*Teacher01$Prg_Value
 
+describe(data.frame(F1,F2))
+```
+
+## Factor Scores {.smaller}
+
+```{r, echo=T}
+Scrs <- fa(FactVars, nfactors=2, rotate="oblimin", fm="minres", n.iter=5, scores="tenBerge")$scores
+describe(Scrs)
+
 cor(data.frame(Scrs,F1,F2),use="pair")
 ```
+
+## Score Reliability {.smaller}
+
+$$\begin{align}
+X_i=&\lambda_{i}*F+E_i\\
+var(\sum{X_i})=&var(    \sum{\lambda_{i}*F+E_i})\\
+              =&var(    \sum{\lambda_{i}*F})+var(\sum{E_i})\\
+              =&var(F * \sum{\lambda_{i}  })  +  \sum{var(E_i)}\\
+              =&var(F)*(\sum{\lambda_{i}  })^2+  \sum{var(E_i)}\\
+              =&(1   )*(\sum{\lambda_{i}  })^2+  \sum{var(E_i)}\\
+\end{align}
+$$
+
+where $var(E_i)$ are uniquenesses
+
+## Score Reliability and SE {.smaller }
+
+
+<div style="float: left; width: 60%;">
+
+```{r, warning=F, message=F, echo=T}
+(ld <- fa(FactVars[,1:6],1)$loadings[] %>% t)
+TrueVar <- sum(ld)^2
+ErrVar  <- sum(fa( FactVars[,1:6],1)$uniquenesses)
+TotVar  <- sum(cor(FactVars[,1:6],use="pair"))
+TrueVar/TotVar
+(Rel <- 1-ErrVar/ TotVar)
+```
+
+</div>
+
+<div style="float: right; width: 40%;">
+
+```{r, warning=F, message=F, echo=T}
+omega(FactVars[,1:6],1)$omega.tot
+(SE<-sd(Scrs[,"MR1"],na.rm=T)*(1-Rel))
+```
+
+</div>
+
+
+## Model Testing and # Factors {.smaller}
+
+```{r, message=F, warning=F, echo=T}
+(f1<-fa(qgraph::cor_auto(FactVars),n.obs=nrow(FactVars),nfactors=2))[c("TLI","RMSEA","BIC")] %>% unlist
+(f4<-fa(qgraph::cor_auto(FactVars[-3]),n.obs=nrow(FactVars),nfactors=2))[c("TLI","RMSEA","BIC")] %>% unlist
+(f2<-fa(qgraph::cor_auto(FactVars),n.obs=nrow(FactVars),nfactors=3))[c("TLI","RMSEA","BIC")] %>% unlist
+(f3<-fa(qgraph::cor_auto(FactVars),n.obs=nrow(FactVars),nfactors=4))[c("TLI","RMSEA","BIC")] %>% unlist
+```
+
 ## Change in True Score Across Time {.smaller}
 
 $$\begin{align}

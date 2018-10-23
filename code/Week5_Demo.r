@@ -30,10 +30,24 @@ rm(Teacher02,Teacher03,Teacher04)
 Vars <- Teacher01 %>% 
   select(PlanImpr,StepsSeq,StepsClear,ClearGoal,ExWork,ExTeach,ExCSR,Prg_Exp,Prg_Eff,Prg_Value,Prg_Change) 
 #' First graph of data 
-Vars %>%  melt %>% 
+Vars[,1:4] %>%  melt %>% 
   ggplot(aes(x=value,fill=variable,group=variable,y=..prop..)) + geom_bar(position = position_dodge() ) + coord_flip()
+Vars[,5:7] %>%  melt %>% 
+  ggplot(aes(x=value,fill=variable,group=variable,y=..prop..)) + geom_bar(position = position_dodge() ) + coord_flip()
+Vars[,8:11] %>%  melt %>% 
+  ggplot(aes(x=value,fill=variable,group=variable,y=..prop..)) + geom_bar(position = position_dodge() ) + coord_flip()
+
+#' Roughly 60% of responses are value 3.  Except for changes called for by my program, whcih has mean 2
 
 #' # Start of class analysis
 
-#' 
+ParallelAnalysis(Vars)
+
+#' We can start by running number of factors.
+
+fa(Vars, nfactors=1:3 )
+
+
+
+
 

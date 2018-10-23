@@ -297,7 +297,6 @@ where $var(E_i)$ are uniquenesses
 
 ## Score Reliability and SE {.smaller }
 
-
 <div style="float: left; width: 60%;">
 
 ```{r, warning=F, message=F, echo=T}
@@ -309,9 +308,7 @@ TrueVar/TotVar
 (Rel <- 1-ErrVar/ TotVar)
 ```
 
-</div>
-
-<div style="float: right; width: 40%;">
+</div><div style="float: right; width: 40%;">
 
 ```{r, warning=F, message=F, echo=T}
 omega(FactVars[,1:6],1)$omega.tot
@@ -319,7 +316,6 @@ omega(FactVars[,1:6],1)$omega.tot
 ```
 
 </div>
-
 
 ## Model Testing and # Factors {.smaller}
 

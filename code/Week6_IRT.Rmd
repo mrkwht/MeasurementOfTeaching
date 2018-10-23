@@ -1,0 +1,285 @@
+---
+title: "Item Response Theory (IRT)"
+author: "Mark White"
+date: "October 23, 2018"
+output: 
+  ioslides_presentation:
+     footer: "Copyright (c) 2018, Mark White"
+     transition: faster
+     widescreen: true
+    
+---
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+if (!grepl("code",getwd())) setwd("code")
+require(tidyverse)
+require(knitr)
+require(kableExtra)
+require(ltm)
+require(psych)
+source('../../../Research/R libraries/DefaultScriptMark.R')
+
+filter <- dplyr::filter
+
+load("../data/LA_Logs.rData")
+LALogs[ !is.na(LALogs) & LALogs == -6 ] <- NA
+LALogs[ !is.na(LALogs) & LALogs == -9 ] <- NA
+
+dim(LALogs)
+dim(LALogs <- filter(LALogs, ll4a %in% 1:2 ))
+
+LALogs$lla1t <- apply(LALogs[c("lla1t","lla1u")], 1, max,na.rm=T)
+LALogs$lla1o <- apply(LALogs[c("lla1o","lla1s")], 1, max,na.rm=T)
+LALogs$lla1o[LALogs$lla1o == -Inf] <- NA
+LALogs$lla1t[LALogs$lla1t == -Inf] <- NA
+LALogs$lla1u <- NULL
+LALogs$lla1s <- NULL
+LALogs <- LALogs %>%
+  mutate(stuid=factor(stuid),
+         geosteid=factor(geosteid),
+         dstrctid=factor(dstrctid),
+         schoolid=factor(schoolid),
+         intv=factor(intv),
+         stucohrt=factor(stucohrt),
+         wave=factor(wave),
+         dc_year=factor(dc_year),
+         grade=factor(grade),
+         race=factor(race),
+         sex=factor(sex),
+         clssrmid=factor(clssrmid),
+         clrmtid=factor(clrmtid) )
+         
+                                    
+```
+
+```{r, cache=T, eval=F, message=F, warning=F}
+# The following  parallel analyses suggest all sub-groups have two factors.
+LALogs %>% filter(grade==1) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(grade==3) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(grade==4) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(grade==5) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="S") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="A") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="X") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="T") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+```
+
+```{r, cache=T, eval=F, message=F}
+GetLoad <- function(x) fa(x,nfactors=2,rotate="promax", cor="poly") %>% .$loadings
+Loadings <- list(
+  G1=LALogs %>% filter(grade==1 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  G3=LALogs %>% filter(grade==3 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  G4=LALogs %>% filter(grade==4 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  G5=LALogs %>% filter(grade==5 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  IS=LALogs %>% filter(intv=="S") %>% select(starts_with("lla1")) %>% GetLoad,
+  IA=LALogs %>% filter(intv=="A") %>% select(starts_with("lla1")) %>% GetLoad,
+  IX=LALogs %>% filter(intv=="X") %>% select(starts_with("lla1")) %>% GetLoad,
+  IT=LALogs %>% filter(intv=="T") %>% select(starts_with("lla1")) %>% GetLoad ) %>% {plyr::ldply(.,.id="Mod")}
+Loadings$Var <- rep(LALogs %>% select(starts_with("lla1")) %>% names,8)
+Loadings <- rbind(Loadings,
+                  LALogs %>% select(starts_with("lla1")) %>%
+                    {data.frame(Mod="mean",
+                             MR1=colMeans(., na.rm=T),
+                             MR2=colMeans(., na.rm=T),
+                             Var=names(.))})
+                             
+tmp <- gather(Loadings, variable,value,MR1,MR2)
+
+# tmp$variable[tmp$Mod %in% c("G5")] <- 
+#   recode(tmp$variable[tmp$Mod %in% c("G5")],
+#          MR1="MR2",MR2="MR1")
+                                        
+tmp %>% filter(Mod %in% c("IS","IA","IX","IT","mean")) %>%
+  ggplot(aes(y=Var,x=value,color=Mod)) +
+  geom_point() + facet_wrap(~variable)
+tmp %>% filter(Mod %in% c("G1","G3","G4","G5","mean")) %>%
+  ggplot(aes(y=Var,x=value,color=Mod)) +
+  geom_point() + facet_wrap(~variable)
+LALogs %>% select(starts_with("lla1")) %>% principal(2,rotate="varimax") %>% print(cut=0.5)
+```
+
+## Classical Test Theory
+
+$$
+X_i=T+E_i
+$$
+
+Test items are scored such that $X\in{0,1}$, but CTT uses statistics for continuous variables.  This works fine for average scores on long tests because the law of large numbers leads error to be normally distributed, but it breaks down somewhat for short tests or when trying to understand the score on an item.  i.e. $E_i=X_i-T=\{0,1\}-T\nsim N(0,\delta_E)$.  Classical Test Theory, then, is not ideal for looking item specific characteristics.
+
+## Item Response Theory from CTT
+
+$$ 
+Y_i=T+E_i
+$$
+
+$$ 
+\begin{align}
+logit(p_i)=&-1.7*a_i(\theta-b_i)\\
+=&-1.7*a_i*\theta+-1.7*a_i*b_i
+\end{align}
+$$
+
+We move from modeling the observed scores to modeling the probability of a correct answer.  The logit transformation scales the $[0,1]$ probability to a $[-\infty,\infty]$ scale, which allows the use of continuous variables $\theta$, $a_i$, and $b_i$.  $-1.7*a_i$ is akin to a factor loading.  The mean is akin to $-1.7*a_i*b_i$. Error gets absorved into the logit scale.
+
+
+## Dichotomous Outcome Models for IRT {.smaller}
+
+4PL model:
+
+$$
+p_i=c_i+\frac{d_i-c_i}{1+e^{-a_i(\theta-b_i)} }
+$$
+
+where $b_i$ is item difficulty, $a_i$ is item discrimination, $c_i$ is a guessing parameter, $d_i$ allows person to miss item they should definitely get.
+
+- Rasch Model: $c_i=0, d_i=1, a_i=1\  \forall i$
+- 1PL Model: $c_i=0, d_i=1, a_i=a\  \forall i$
+- 2PL Model: $c_i=0, d_i=1\  \forall i$
+- 3PL Model: $c_i=0\  \forall i$
+
+## Dichotomous Outcome Models
+
+```{r}
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=0.1+(0.95-0.1)/(1+exp(-0.5*(x-0  ))),
+         y2=0.0+(0.95-0.0)/(1+exp(-3*(x-0  ))),
+         y3=0.1+(1.00-0.1)/(1+exp(-3*(x-0.5))),
+         y4=0.0+(1.00-0.0)/(1+exp(-0.5*(x-0.5)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y3,color="green"))+
+  geom_line(aes(y=y4,color="black"))+
+  theme_bw()+
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","green","black"),
+                     labels=c("a=0.5, b=0.0, c=0.10, d=0.95",
+                              "a=3.0, b=0.0, c=0.00, d=0.95",
+                              "a=3.0, b=0.5, c=0.10, d=1.00",
+                              "a=0.5, b=0.5, c=0.00, d=1.00"))                    
+```
+
+## Graded Response Model
+
+$$
+\begin{align}
+Pr(x_{im}\leq k|\theta)&=\frac{1}{1+e^{-a_i(\theta-b_{ik})} }\\
+Pr(x_{im}=k|\theta) &=logistic(\eta_{ik})-logistic(\eta_{i,k+1})
+\end{align}
+$$
+
+where $k \in \{1,...K\}$ with $K$ is the number of categories of response.
+
+## Log Items
+
+<img src="Figs/LogItems.png" alt="drawing" width="800" style="position:absolute;top:111px;align:middle"/>
+
+## Assumptions: Local Independence
+
+$$ 
+logit(p_i)=-1.7*a_i(\theta-b_i)
+$$
+
+Conditional on $\theta$, the $p_i$ are independent across $i$.  i.e. "ability" is the only person characteristic affecting scoring items completely.
+
+## Assumptions: Unidimensionality
+
+$$ 
+logit(p_i)=-1.7*a_i(\theta-b_i)
+$$
+
+$\theta$ is a single-dimensional characteristic.  Some IRT models, called item factor analysis, allow multi-dimensional $\theta$ variables.
+
+## Dimensionality
+
+```{r, message=F, warning=F, cache=T}
+LALogs %>% select(starts_with("lla1")) %>% ParallelAnalysis %>% invisible
+```
+
+## Dimensionality {.smaller}
+
+```{r}
+LALogs %>% select(starts_with("lla1")) %>%  fa(nfactors=3,rotate="oblimin", cor="poly") %>% .$loadings  %>% print(cut=0.3)
+```
+
+## Remove A,B,C,J,K,L
+
+```{r, echo=T}
+LALogs <- LALogs %>% select(-lla1a,-lla1b,-lla1c,
+                            -lla1j,-lla1k,-lla1l)
+```
+
+## Polytomous Model {.smaller}
+
+Does the constrained (i.e. 1PL equivalent) model fit data as well as unconstrained model?
+
+```{r, echo=T, cache=T}
+#  
+graded <- LALogs %>% select(starts_with("lla1")) %>% grm
+graded2 <- LALogs %>% select(starts_with("lla1")) %>% grm(constrained=T)
+anova(graded2,graded)
+```
+
+## Polytomous Model  {.vcenter .flexbox}
+
+```{r}
+plyr::ldply(graded$coefficients,.id="Var") %>% kable(digits=2)
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+plot(graded,type="ICC",items=1)
+```
+
+## Score from IRT model
+
+```{r, echo=T}
+tmp <- ltm::factor.scores(graded,method="EAP")$score.dat %>% 
+  select(-Obs, -Exp) 
+sc <- merge(data.frame( LALogs %>% select(starts_with("lla1")) + 1 , 
+  intv=LALogs$intv), tmp, all.x=T)
+sc$M <- sc %>% select(starts_with("lla1")) %>% apply(1,mean,na.rm=T)
+describe(sc$z1, skew=F)
+cor(sc$M,sc$z1)
+```
+
+## Score from IRT Model
+
+```{r}
+hist.rug(sc$z1,describe=T)
+```
+
+## Score from IRT model by SE {.smaller}
+
+```{r}
+ggplot(sc,aes(x=z1,y=se.z1) ) + geom_point() + theme_bw() + 
+  geom_hline(yintercept = sqrt(1-0.88),color="red")
+```
+
+## Information Function {.flexbox .vcenter}
+
+```{r}
+plot(graded,type="IIC")
+```
+
+## Test Information Curve {.flexbox .vcenter}
+
+```{r}
+plot(graded,type="IIC",items=0)
+# information(graded,range=c(-2,2))
+```
+
+## Differential Item Functioning {.smaller}
+
+```{r, echo=T}
+m1<-glm(I(lla1d > 1)~ z1,sc,family="binomial")
+broom::tidy(m2<-glm(I(lla1d > 1)~ z1+intv,sc,family="binomial"))
+anova(m1,m2,test="LRT")
+```

@@ -211,8 +211,8 @@ LALogs %>% select(starts_with("lla1")) %>%  fa(nfactors=3,rotate="oblimin", cor=
 ## Remove A,B,C,J,K,L
 
 ```{r, echo=T}
-LALogs <- LALogs %>% select(-lla1a,-lla1b,-lla1c,
-                            -lla1j,-lla1k,-lla1l)
+# LALogs <- LALogs %>% select(-lla1a,-lla1b,-lla1c,
+#                             -lla1j,-lla1k,-lla1l)
 ```
 
 ## Polytomous Model {.smaller}

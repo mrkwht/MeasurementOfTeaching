@@ -1,0 +1,438 @@
+---
+title: "Item Response Theory (IRT)"
+author: "Mark White"
+date: "October 23, 2018"
+output: 
+  ioslides_presentation:
+     footer: "Copyright (c) 2018, Mark White"
+     transition: faster
+     widescreen: true
+    
+---
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+if (!grepl("code",getwd())) setwd("code")
+require(tidyverse)
+require(knitr)
+require(kableExtra)
+require(ltm)
+require(psych)
+source('../../../Research/R libraries/DefaultScriptMark.R')
+
+filter <- dplyr::filter
+
+load("../data/LA_Logs.rData")
+LALogs[ !is.na(LALogs) & LALogs == -6 ] <- NA
+LALogs[ !is.na(LALogs) & LALogs == -9 ] <- NA
+
+dim(LALogs)
+dim(LALogs <- filter(LALogs, ll4a %in% 1:2 ))
+
+LALogs$lla1t <- apply(LALogs[c("lla1t","lla1u")], 1, max,na.rm=T)
+LALogs$lla1o <- apply(LALogs[c("lla1o","lla1s")], 1, max,na.rm=T)
+LALogs$lla1o[LALogs$lla1o == -Inf] <- NA
+LALogs$lla1t[LALogs$lla1t == -Inf] <- NA
+LALogs$lla1u <- NULL
+LALogs$lla1s <- NULL
+LALogs <- LALogs %>%
+  mutate(stuid=factor(stuid),
+         geosteid=factor(geosteid),
+         dstrctid=factor(dstrctid),
+         schoolid=factor(schoolid),
+         intv=factor(intv),
+         stucohrt=factor(stucohrt),
+         wave=factor(wave),
+         dc_year=factor(dc_year),
+         grade=factor(grade),
+         race=factor(race),
+         sex=factor(sex),
+         clssrmid=factor(clssrmid),
+         clrmtid=factor(clrmtid) )
+         
+                                    
+```
+
+```{r, cache=T, eval=F, message=F, warning=F}
+# The following  parallel analyses suggest all sub-groups have two factors.
+LALogs %>% filter(grade==1) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(grade==3) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(grade==4) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(grade==5) %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="S") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="A") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="X") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+LALogs %>% filter(intv=="T") %>% select(starts_with("lla1")) %>% ParallelAnalysis
+```
+
+```{r, cache=T, eval=F, message=F}
+GetLoad <- function(x) fa(x,nfactors=2,rotate="promax", cor="poly") %>% .$loadings
+Loadings <- list(
+  G1=LALogs %>% filter(grade==1 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  G3=LALogs %>% filter(grade==3 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  G4=LALogs %>% filter(grade==4 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  G5=LALogs %>% filter(grade==5 ) %>% select(starts_with("lla1")) %>% GetLoad,
+  IS=LALogs %>% filter(intv=="S") %>% select(starts_with("lla1")) %>% GetLoad,
+  IA=LALogs %>% filter(intv=="A") %>% select(starts_with("lla1")) %>% GetLoad,
+  IX=LALogs %>% filter(intv=="X") %>% select(starts_with("lla1")) %>% GetLoad,
+  IT=LALogs %>% filter(intv=="T") %>% select(starts_with("lla1")) %>% GetLoad ) %>% {plyr::ldply(.,.id="Mod")}
+Loadings$Var <- rep(LALogs %>% select(starts_with("lla1")) %>% names,8)
+Loadings <- rbind(Loadings,
+                  LALogs %>% select(starts_with("lla1")) %>%
+                    {data.frame(Mod="mean",
+                             MR1=colMeans(., na.rm=T),
+                             MR2=colMeans(., na.rm=T),
+                             Var=names(.))})
+                             
+tmp <- gather(Loadings, variable,value,MR1,MR2)
+
+# tmp$variable[tmp$Mod %in% c("G5")] <- 
+#   recode(tmp$variable[tmp$Mod %in% c("G5")],
+#          MR1="MR2",MR2="MR1")
+                                        
+tmp %>% filter(Mod %in% c("IS","IA","IX","IT","mean")) %>%
+  ggplot(aes(y=Var,x=value,color=Mod)) +
+  geom_point() + facet_wrap(~variable)
+tmp %>% filter(Mod %in% c("G1","G3","G4","G5","mean")) %>%
+  ggplot(aes(y=Var,x=value,color=Mod)) +
+  geom_point() + facet_wrap(~variable)
+LALogs %>% select(starts_with("lla1")) %>% principal(2,rotate="varimax") %>% print(cut=0.5)
+```
+
+## From CTT to IRT 
+
+CTT: 
+
+$$
+X_i=T+E_i=(\mu+F)+E_i
+$$
+
+Factor Analysis: 
+
+$$
+X_i=\mu_i+\sum_j^J{\lambda_i*F_j}+E_i
+$$
+
+IRT: 
+
+$$
+logit(p_i)=-a_i*b_i + a_i*\theta= -a_i(b_i - \theta)
+$$
+
+$$
+p_i=\frac{1}{1+e^{-a_i(\theta-b_i)} }
+$$
+
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+TestInfo <- function(x) apply(plyr::ldply(lapply(x,function(y) y*(1-y))),2,sum)
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=(1)/(1+exp(-2.0*(x+2.0))),
+         y2=(1)/(1+exp(-2.0*(x+1.0))),
+         y3=(1)/(1+exp(-2.0*(x-1.0))),
+         y4=(1)/(1+exp(-2.0*(x-2.0)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y3,color="green"))+
+  geom_line(aes(y=y4,color="black"))+
+  geom_line(aes(y=4*TestInfo(list(y1,y2,y3,y4)),color="grey"))+
+  theme_bw()+ scale_x_continuous(breaks=(-5):5,minor_breaks=F) +
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","green","black","grey"),
+                     labels=c(red  ="a=2.0, b=-2.0",
+                              blue ="a=2.0, b=-1.0",
+                              green="a=2.0, b=1.0",
+                              black="a=2.0, b=2.0",
+                              grey="Test Information"))                    
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=(1)/(1+exp(-1.0*(x+2.0))),
+         y2=(1)/(1+exp(-1.0*(x+1.0))),
+         y3=(1)/(1+exp(-1.0*(x-1.0))),
+         y4=(1)/(1+exp(-1.0*(x-2.0)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y3,color="green"))+
+  geom_line(aes(y=y4,color="black"))+
+  geom_line(aes(y=1*TestInfo(list(y1,y2,y3,y4)),color="grey"))+
+  theme_bw()+ scale_x_continuous(breaks=(-5):5,minor_breaks=F) +
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","green","black","grey"),
+                     labels=c(red  ="a=1.0, b=-2.0",
+                              blue ="a=1.0, b=-1.0",
+                              green="a=1.0, b=1.0",
+                              black="a=1.0, b=2.0",
+                              grey="Test Information"))                    
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=(1)/(1+exp(-0.5*(x+2.0))),
+         y2=(1)/(1+exp(-0.5*(x+1.0))),
+         y3=(1)/(1+exp(-0.5*(x-1.0))),
+         y4=(1)/(1+exp(-0.5*(x-2.0)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y3,color="green"))+
+  geom_line(aes(y=y4,color="black"))+
+  geom_line(aes(y=1/4*TestInfo(list(y1,y2,y3,y4)),color="grey"))+
+  theme_bw()+ scale_x_continuous(breaks=(-5):5,minor_breaks=F) +
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","green","black","grey"),
+                     labels=c(red  ="a=0.5, b=-2.0",
+                              blue ="a=0.5, b=-1.0",
+                              green="a=0.5, b=1.0",
+                              black="a=0.5, b=2.0",
+                              grey="Test Information"))                     
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=(1)/(1+exp(-1.0*(x+2.0))),
+         y2=(1)/(1+exp(-0.3*(x+1.0))),
+         y3=(1)/(1+exp(-0.3*(x-1.0))),
+         y4=(1)/(1+exp(-1.0*(x-2.0)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y3,color="green"))+
+  geom_line(aes(y=y4,color="black"))+
+  geom_line(aes(y=y1*(1-y1)*1+
+                  y2*(1-y2)*.09+
+                  y3*(1-y3)*.09+
+                  y4*(1-y4)*1 ,color="grey"))+
+  theme_bw()+ scale_x_continuous(breaks=(-5):5,minor_breaks=F) +
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","green","black","grey"),
+                     labels=c(red  ="a=1.0, b=-2.0",
+                              blue ="a=0.3, b=-1.0",
+                              green="a=0.3, b=1.0",
+                              black="a=1.0, b=2.0",
+                              grey="Test Information"))                      
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=(1)/(1+exp(-1.5*(x+0))),
+         y2=(1)/(1+exp(-1.0*(x+0))),
+         y3=(1)/(1+exp(-0.5*(x-0))),
+         y4=(1)/(1+exp(-0.2*(x-0)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y3,color="green"))+
+  geom_line(aes(y=y4,color="black"))+
+  geom_line(aes(y=y1*(1-y1)*1.5*1.5+
+                  y2*(1-y2)*1+
+                  y3*(1-y3)*.25+
+                  y4*(1-y4)*.04 ,color="grey"))+
+  theme_bw()+ scale_x_continuous(breaks=(-5):5,minor_breaks=F) +
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","green","black","grey"),
+                     labels=c(red  ="a=2.0, b=0",
+                              blue ="a=1.0, b=0",
+                              green="a=0.5, b=0",
+                              black="a=0.2, b=0",
+                              grey="Test Information"))                         
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+data.frame(x=seq(-5,5,length.out=300)) %>%
+  mutate(y1=(1)/(1+exp(-2*(x+0))),
+         y2=(1)/(1+exp(-0.5*(x+0)))) %>%
+  ggplot(aes(x=x)) +
+  geom_line(aes(y=y1,color="red"))+
+  geom_line(aes(y=y2,color="blue"))+
+  geom_line(aes(y=y1*(1-y1)*2*2,color="grey"))+
+  geom_line(aes(y=y2*(1-y2)*0.5*0.5,color="black"))+
+  theme_bw()+ scale_x_continuous(breaks=(-5):5,minor_breaks=F) +
+  theme(legend.position = c(0.05, 0.95),legend.justification = c(0, 1))+
+  scale_color_manual("Par Values",
+                     values=c("red","blue","black","grey"),
+                     labels=c(red  ="Item 1",
+                              blue ="Item 2",
+                              black="Item 2 Information",
+                              grey="Item 1 Information"))                         
+```
+
+## Log Items
+
+<img src="Figs/LogItems.png" alt="drawing" width="800" style="position:absolute;top:111px;align:middle"/>
+
+## Creating a Cognitive Rigor Scale
+
+- Summarizing important details (A1q)
+- Identifying story structure (A1n)
+- Sequencing information or events (A1m)
+- Analyzing and evaluating text (A1r)
+- Comparing and/or contrasting information or texts (A1p)
+- Activating prior knowledge or making personal connections to text (A1a)
+- Making predictions, previewing, or surveying (A1b)
+
+What must be true for these to represent a "cognitive rigor" scale?
+
+## Assumptions
+
+$$ 
+logit(p_i)=-1.7*a_i(\theta-b_i)
+$$
+
+- Local Independence
+    - Conditional on $\theta$, the $p_i$ are independent across $i$.  i.e. "ability" is the only person characteristic affecting scoring items completely.
+- Unidimensionality
+    - $\theta$ is a single-dimensional characteristic.  Some IRT models, called item factor analysis, allow multi-dimensional $\theta$ variables.
+
+## Dimensionality {.vcenter .flexbox}
+
+```{r, message=F, warning=F, cache=T}
+LALogs %>% select(lla1q,lla1n,lla1m,lla1r,lla1p,lla1a,lla1b) %>% ParallelAnalysis %>% invisible
+```
+
+## Dimensionality {.smaller}
+
+```{r}
+LALogs %>% select(lla1q,lla1n,lla1m,lla1r,lla1p,lla1a,lla1b) %>%  fa(nfactors=2,rotate="oblimin", cor="poly") %>% 
+  .$loadings  %>% print(cut=0.3) 
+
+dat2 <- LALogs %>% select(lla1q,lla1n,lla1m,lla1r,lla1p,lla1a,lla1b) %>% sapply(function(x) 1*(x==2))  %>% as.data.frame %>% 
+  mutate(grade=LALogs$grade) %>% 
+  na.omit
+dat <- dat2 %>% select(-grade)
+items <- data.frame(Text=c("Summarizing important details",
+                           "Identifying story structure",
+                           "Sequencing information or events",
+                           "Analyzing and evaluating text",
+                           "Comparing and/or contrasting information or texts",
+                           "Activating prior knowledge or making personal connections to text",
+                           "Making predictions, previewing, or surveying"),
+                    Item=c("lla1q","lla1n","lla1m","lla1r","lla1p","lla1a","lla1b") )
+
+
+
+
+
+
+```
+
+## Rasch/1PL Model
+
+```{r, echo=T, cache=T}
+mod.r <- rasch(dat, constraint=cbind(8,1))
+coef <- mod.r$coefficients
+merge(items,data.frame(Item=row.names(coef),Diff=-coef[,1]/coef[,2])) %>% 
+  arrange(Diff) %>% kable(digits=2)
+
+```
+
+## Rasch vs 2PL Model 
+
+```{r, echo=T}
+mod.2 <- ltm(dat~z1)
+anova(mod.r,mod.2)
+```
+
+## Rasch vs 2PL Model {.smaller}
+
+```{r}
+mod.2$coefficients %>% kable(digits=2)
+```
+
+## Item Characteristics Curves {.vcenter .flexbox}
+
+```{r}
+plot(mod.r,type="ICC",zrange=c(-2,5))
+```
+
+## Score from IRT model
+
+```{r, echo=T}
+tmp <- ltm::factor.scores(mod.r,method="EAP", dat)$score.dat$z1
+M <- apply(dat, 1,mean,na.rm=T)
+describe(tmp, skew=F)
+describe(M, skew=F)
+cor(tmp,M, use="pair")
+```
+
+## Score from IRT Model {.vcenter .flexbox}
+
+```{r}
+hist.rug(tmp,describe=F,main="Distribution of Rasch Score")
+```
+
+## Score from IRT model by SE {.smaller}
+
+```{r}
+ltm::factor.scores(mod.r,method="EAP")$score.dat %>% 
+  ggplot(aes(x=z1/sd(tmp), y=se.z1/sd(tmp) )) + geom_point() +
+  geom_smooth(se=F,method="lm",formula=y~poly(x, 3)) + theme_bw()
+```
+
+
+## Overall Test Reliability
+
+- IRT Test Reliabilty:`r N*N*var(tmp)/(N*N*var(tmp)+2*pi*pi/3)`
+
+- alpha: `r alpha(dat)$total$raw_alpha`
+
+
+
+## Information Function {.flexbox .vcenter}
+
+```{r}
+plot(mod.r,type="IIC",zrange=c(-2,5))
+```
+
+## Test Information Curve {.flexbox .vcenter}
+
+```{r}
+plot(mod.r,type="IIC",items=0,zrange=c(-2,5))
+N=ncol(dat)
+```
+
+## Differential Item Functioning {.smaller}
+
+```{r, echo=T}
+m1<-glm(dat$lla1q~ tmp,family="binomial")
+broom::tidy(m2<-glm(dat$lla1q~tmp+dat2$grade,family="binomial"))
+anova(m1,m2,test="LRT")
+```
+
+## Item Fit
+
+```{r}
+item.fit(mod.r)
+```
+
+## Person Fit  {.vcenter}
+
+```{r, cache=T}
+p <- person.fit(mod.r, resp.patterns=dat)$p.values
+hist.rug(p)
+mean(p <= 0.05)
+```

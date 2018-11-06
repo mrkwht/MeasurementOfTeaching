@@ -1,0 +1,183 @@
+---
+title: "Generalizability Theory (GTheory)"
+author: "Mark White"
+date: "November 6, 2018"
+output: 
+  ioslides_presentation:
+     footer: "Copyright (c) 2018, Mark White"
+     transition: faster
+     widescreen: true
+    
+---
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# if (!grepl("code",getwd())) setwd("code")
+require(kableExtra)
+require(irr)
+require(tidyverse)
+require(knitr)
+require(kableExtra)
+require(ltm)
+require(psych)
+source('../../../Research/R libraries/DefaultScriptMark.R')
+
+filter <- dplyr::filter
+rename=dplyr::rename
+load("../data/Dat_Video_wHF.rData")
+Videot <- Videot %>% select(-Domain, -Interact, -ObsTime, -(CLASS_APS:PLATO_TMN), -AveSc, -DomNone, -IntNone, -PCA1, -PCA2,
+                            -(Sec_PctELL:Sec_PctM), -Sec_PctELL, -Sec_PctSPED, -Sec_PctFRL, -Sec_PctGIFT, -Sec_PctA, -Sec_PctB, 
+                            -Sec_PctH, -Sec_PctW, -Sec_PctM, -VAM_T_Reg6_AltYr_SE, -Sec_VAM_SE, -VAM_T_Reg6_SE, -Sec_PriorAch  ) %>%
+  filter(Protocol=="PLATO") %>%
+  select(-CodeDate, -Protocol) 
+head(Videot)
+```
+
+
+
+```{r, cache=T, include=F}
+mod <- lmer(value~variable+(1|SegID)+(1|LessonID)+(1|SectionID)+(1|TeacherID)+(1|Observer)+
+              (1|Observer:SegID)+(1|Observer:LessonID)+(1|Observer:SectionID)+(1|Observer:TeacherID)+
+              (1|variable:SegID)+(1|variable:LessonID)+(1|variable:SectionID)+(1|variable:TeacherID)+
+              (1|variable:Observer)+(1|Observer:variable:TeacherID)
+            , Videot, control=lmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5),calc.derivs=F) )
+summary(mod)
+```
+
+## Generalizability Theory (GTheory)
+
+- Any instance of measurement occurs in a specific context
+- Aspects of this context, called facets, may affect the measurement
+- For example, in observation instruments, measurement is affected by the day being observed, the section observed, the item being scored, the rater doing the scoring, and (if scoring occurs on lesson segments) the segment of the lesson being scored.
+
+## Universe of Generalization
+
+- GTheory focuses on the extent to which scores generalize across facets to a specified universe of generalization
+- The universe of generalization is defined by the facets across which measurement occurs
+- GTheory takes measurements across various levels of each facet to empirically test the extent to which scores generalize across facets
+
+## From CTT to GTheory {.smaller}
+
+CTT:
+
+$$
+X_i=T+E_i
+$$
+
+GTheory:
+
+$$
+\begin{align}
+X_i=&T+E_i\\
+E_i=&E_{Segment}+E_{Lesson}+E_{Section}+E_{Rater}+\\
+&E_{Rater:Segment}+E_{Rater:Lesson}+E_{Rater:Section}+E_{Rater:Teacher}+\\
+&E_{Item:Segment} +E_{Item:Lesson} +E_{Item:Section} +E_{Item:Teacher} +\\
+&E_{Item:Rater} +E_{Item:Rater:Teacher}
+\end{align}
+$$
+
+## Variance Observed Scores {.smaller}
+
+$$
+\begin{align}
+var(X)=&var(T)+var(E_{Segment})+var(E_{Lesson})+var(E_{Section})+\\
+&var(E_{Rater})+var(E_{Rater:Segment})+var(E_{Rater:Lesson})+\\
+&var(E_{Rater:Section})+var(E_{Rater:Teacher})+var(E_{Item:Segment} )+\\
+&var(E_{Item:Lesson })+var(E_{Item:Section })+var(E_{Item:Teacher} )+\\
+&var(E_{Item:Rater:Section})+var(E_{Item:Rater:Teacher})
+\end{align}
+$$
+
+## Average of Random Variables
+
+$$
+var((E_1+E_2)/2)=(1/4)*(var(E)+var(E))=var(E)/2
+$$
+
+If $E_1$ and $E_2$ are two different raters, taking observations across these raters will reduce error variance, thereby increasing reliability.  This is the basis of GTheory, by taking measurements across multiple levels of each factor, the error variance from that factor is reduced.  
+
+## Reliability of Measurement at the Segment Level
+
+What if we want to know whether we are capturing the observation instrument's view of teaching quality at the segment level?  i.e. are we capturing PLATO's version of teacher quality or rater's idiosyncratic view of teaching quality?
+
+In this case, the only facet is the rater and the universe of generalization only spans across raters.  In this situation, only inter-rater reliability matters
+
+## Cohen's Kappa 
+
+Kappa adjusts for the fact that scores are provided on a limited scale so raters might agree through random chance.  $p_0$ is observed agreement. $p_e$ is expected agreement
+
+$$
+\begin{align}
+k&=\frac{p_0-p_e}{1-p_e} \\
+p_e&=\sum{\frac{n_{k1}}{N}\frac{n_{k2}}{N}}
+\end{align}
+$$
+
+## Intra-Class Correlation {.smaller}
+
+Intra-class correlation is simply the percentage of variance due to the object of measurement.  
+
+## Inter-Rater Reliablity - PLATO
+
+```{r, results="asis"}
+Videot %>% select(SegID,value,variable) %>% 
+  group_by(SegID,variable) %>% mutate(n=1:n()) %>% 
+  spread(n,value) %>% group_by(variable) %>% 
+  rename(`V1`="1",`V2`="2") %>% 
+  summarise(Kappa =kappa2(na.omit(data.frame(V1,V2)))$value ) %>%
+  merge(Videot %>% select(SegID,value,Observer, variable) %>% 
+  group_by(variable) %>% 
+  summarise(ICC= lmer(value~1+(1|Observer)+(1|SegID)) %>% VarPer %>% .["SegID"]) ) %>%
+  mutate(variable=recode(variable, PLATO_ALL="Accom Lang Learn",  PLATO_BMN="Behavior Manage",  PLATO_CD="Classroom Discussion",  PLATO_CPE="Connect Personal Experience",  PLATO_CPK="Connect Prior Knowledge",  PLATO_ESI="Explicit Strategy Instruction",  PLATO_GP="Guided Practice",  PLATO_INTC="Intellectual Challenge",  PLATO_MOD="Modeling",  PLATO_PURP="Purpose",  PLATO_RC="Represent Content",  PLATO_TBI="Text Based Instruction",  PLATO_TMN="Time Manage" ) %>%
+           factor(c("Purpose","Intellectual Challenge","Represent Content","Connect Prior Knowledge","Connect Personal Experience","Modeling","Explicit Strategy Instruction","Classroom Discussion","Text Based Instruction","Guided Practice","Accom Lang Learn","Behavior Manage","Time Manage") ) ) %>% arrange(variable) %>%
+  kable(digits=2) %>% 
+  kable_styling(bootstrap_options=
+                  c("striped","hover","condensed","responsive"))%>%
+  row_spec(0, bold = T, color="black", background="lightgrey")
+```
+
+```{r, include=F}
+Videot %>% select(SegID,value,variable) %>% 
+  group_by(SegID,variable) %>% mutate(n=1:n()) %>% 
+  spread(n,value) %>% group_by(variable) %>% rename(`V1`="1",`V2`="2") %>% 
+  summarise(ICC= icc(na.omit(data.frame(V1,V2)))$value )
+```
+
+## Full G-Theory Decomposition of PLATO 
+
+```{r}
+data.frame(Var=names(VarPer(mod)),
+           Val=unname(VarComp(mod)), 
+           Pct=unname(VarPer(mod)) ) %>%
+  mutate(Var=recode(Var, `TeacherID`              ="Teacher",
+                    `SectionID`                   ="Section",
+                    `LessonID`                    ="Lesson",
+                    `SegID`                       ="Segment",
+                    `Observer`                    ="Rater",
+                    `Observer:TeacherID`          ="Rater*Teacher",
+                    `Observer:SectionID`          ="Rater*Section",
+                    `Observer:LessonID`           ="Rater*Day",
+                    `Observer:SegID`              ="Rater*Segment",
+                    `variable:TeacherID`          ="Item*Teacher",
+                    `variable:SectionID`          ="Item*Section",
+                    `variable:LessonID`           ="Item*Day",
+                    `variable:SegID`              ="Item*Segment",
+                    `variable:Observer`           ="Item*Rater",
+                    `Observer:variable:TeacherID` ="R*I*Teacher",
+                    `Observer:variable:SectionID` ="R*I*Section",
+                    `Residual`                    ="Resid" ) %>%
+           factor(c("Teacher","Section","Lesson","Segment","Rater",
+                    "Rater*Teacher","Rater*Section","Rater*Day","Rater*Segment",
+                    "Item*Teacher" ,"Item*Section" ,"Item*Day" ,"Item*Segment" , "Item*Rater",
+                    "R*I*Teacher","R*I*Section","Resid" ) ) ) %>%
+  arrange(Var) %>% kable(digits=2) %>%  
+  kable_styling(bootstrap_options = c("striped","hover","condensed"))
+```
+
+## PLATO D-Study
+
+<img src="Figs/PlatoReliability.png" alt="drawing" width="800" style="position:absolute;top:111px;align:middle"/>

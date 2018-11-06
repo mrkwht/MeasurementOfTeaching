@@ -324,6 +324,7 @@ dat2 <- LALogs %>% select(lla1q,lla1n,lla1m,lla1r,lla1p,lla1a,lla1b) %>% sapply(
   mutate(grade=LALogs$grade) %>% 
   na.omit
 dat <- dat2 %>% select(-grade)
+N=ncol(dat)
 items <- data.frame(Text=c("Summarizing important details",
                            "Identifying story structure",
                            "Sequencing information or events",
@@ -412,7 +413,7 @@ plot(mod.r,type="IIC",zrange=c(-2,5))
 
 ```{r}
 plot(mod.r,type="IIC",items=0,zrange=c(-2,5))
-N=ncol(dat)
+
 ```
 
 ## Differential Item Functioning {.smaller}

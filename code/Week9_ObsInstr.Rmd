@@ -1,0 +1,160 @@
+---
+title: 'Week 9: Observation Instruments'
+author: "Mark White"
+date: "November 12, 2018"
+output: html_document
+---
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# if (!grepl("code",getwd())) setwd("code")
+require(kableExtra)
+require(irr)
+require(tidyverse)
+require(knitr)
+require(kableExtra)
+require(ltm)
+require(psych)
+source('../../../Research/R libraries/DefaultScriptMark.R')
+
+filter <- dplyr::filter
+rename=dplyr::rename
+load("../data/Dat_Video_wHF.rData")
+Videot$Observer <- relevel(Videot$Observer, "315")
+Videot <- Videot %>% select(-Domain, -Interact, -ObsTime, -(CLASS_APS:PLATO_TMN), -AveSc, -DomNone, -IntNone, -PCA1, -PCA2, -Sec_PctMimp,
+                            -(Sec_PctELL:Sec_PctM), -VAM_T_Reg6_AltYr_SE, -Sec_VAM_SE, -VAM_T_Reg6_SE,-Seg.Red,-Sec_PctGIFTimp,-Sec_PctAimp,
+                            -Sec_PctELLimp, -SYearID, -ObsDate, -Sec_PriorAch, -ClassLength,-Sec_Cotaught,-ClassLengthc) %>%
+  filter(Protocol=="FFT") %>%
+  select(-CodeDate, -Protocol) 
+head(Videot)
+head(Videow <- Videot %>% spread(variable,value) %>% na.omit)
+items <- grep("FFT_",names(Videow),value=T)
+```
+
+The code above creates two different data sets.  `Videot` stacks the variables so that each row is a response to a specific item on a specific segment.  `Videow` is wide and has each row representing a segment with scores as separate columns.
+
+## Average
+
+We can take the average across items to get a segment mean score and use that as the score for segment quality.
+
+```{r}
+Videow$M <- Videow %>% select(items) %>% rowMeans(na.rm=T)
+hist.rug(Videow$M)
+```
+
+Testing for reliability of scores at the segment level is done with alpha
+
+```{r}
+Videow %>% select(items) %>% alpha
+```
+
+The alpha reliability, though, is only looking at the item error and other error sources remain.
+
+## G-Theory 
+
+For 
+
+```{r}
+# lmer(value~variable+(1|LessonID)+(1|TeacherID)+(1|SegID)+
+```
+
+## IRT
+
+
+
+```{r}
+require(mirt)
+
+IRT1 <- mirt(select(Videow, starts_with("FFT")),itemtype="graded", model=1,
+             covdata=Videow[,c("Read","Writ","Lit","Grammar","Observer")], 
+             formula=~Read+Writ+Lit+Grammar+Observer)
+summary(IRT1)
+
+IRT <- mirt(select(Videow, starts_with("FFT")),itemtype="graded", model=1,
+            covdata=Videow[,c("Read","Writ","Lit","Grammar","Observer","Observer")], 
+            formula=~Observer)
+summary(IRT)
+anova(IRT,IRT1)
+
+hist.rug(fscores(IRT1)[,1])
+itemfit(IRT)
+ggplot(,aes(x=round(fscores(IRT)[,1],1))) + 
+  stat_smooth(aes(y=Videow$FFT_QDT,color="FFT_QDT"))+
+  stat_smooth(aes(y=Videow$FFT_CL ,color="FFT_CL" ))+
+  scale_color_manual("Item",
+                     values=c("red","blue"))+
+  labs(y="Average Value",x="Theta")
+
+personfit(IRT) %>% .[[1]] %>% hist.rug
+
+mlIRT <- mixedmirt(select(Videow, starts_with("FFT")),
+          covdata=select(Videow, LessonID,TeacherID,Observer),
+          itemtype="graded", model=1, lr.fixed=~Observer,
+          lr.random= list(Teacher=~1|TeacherID)  )
+
+coef(mlIRT) %>% .[1:11] %>% lapply(.,function(x) data.frame(x,type=row.names(x))) %>% bind_rows(.id="Item") %>% filter(type=="par")
+coef(mlIRT)
+
+str(a<-randef(mlIRT))
+
+for (i in c("FFT_CL","FFT_CS","FFT_ESL","FFT_FR","FFT_KC","FFT_MCP","FFT_MSB","FFT_OPS","FFT_QDT","FFT_RR","FFT_UAI")) 
+  print(itemplot(IRT,i, main=i))
+print(itemplot(IRT,1,type="infoSE"))
+itemplot(IRT,type="infotrace",item="FFT_CL")
+itemplot(IRT,type="SE",item="FFT_CL")
+itemplot(IRT,type="score",item="FFT_CL")
+
+# itemplot(IRT,type="score",item="FFT_CL",shiny=T)
+```
+
+
+## Effects of Instructional 
+
+
+```{r}
+require(lme4)
+
+summary(base<-lmer(value~variable+Observer+(1|TeacherID)+(1|LessonID),Videot))
+summary(adj <-lmer(value~variable+Observer+(1|TeacherID)+(1|LessonID)+Read+Writ+Lit+Grammar+Rec+Disc+Ind,Videot))
+anova(base,adj)
+summary(adj2 <-lmer(value~variable+Observer+(1|TeacherID)+(1|LessonID)+DiscrIndex+Read+Writ+Lit+Grammar+Rec+Disc+Ind,Videot))
+
+cor(data.frame(base=ranef(base)$TeacherID, adj=ranef(adj)$TeacherID, adj2=ranef(adj2)$TeacherID))
+
+
+summary(adj2 <-lmer(value~variable+Observer+(1|TeacherID)+(1|LessonID)+Writ,Videot))
+cor(data.frame(base=ranef(base)$TeacherID, adj=ranef(adj2)$TeacherID))
+merge(ranef(base)$TeacherID %>% rownames_to_column("TID") %>% rename(Base="(Intercept)"), 
+      ranef(adj2)$TeacherID %>% rownames_to_column("TID") %>% rename(adj ="(Intercept)")) %>%
+  merge(Videot %>% group_by(TeacherID) %>% summarize(W=mean(Writ)) %>% ungroup %>% rename(TID="TeacherID")) %>%
+  ggplot(aes(x=(Base+adj)/2,y=Base-adj,color=W)) + geom_point()
+#
+
+```
+
+
+
+## Overall FActor Analysis
+
+```{r, eval=F}
+load("../data/Dat_Video_wHF.rData")
+Vid <- Videot %>% 
+  mutate(value=case_when(grepl("CLASS",variable) ~ (value-1)/2+1,
+                         T ~ as.numeric(value))) %>% 
+  mutate(value=resid(lm(value~variable:Observer, na.action=na.exclude))) %>%
+  filter(ScoreType=="Regular") %>%
+  select(SegID,variable,value) %>%
+  spread(variable,value)
+
+Vid %>% select(starts_with("PLATO"),starts_with("FFT"),starts_with("CLASS")) %>% ParallelAnalysis
+Vid %>% select(starts_with("PLATO"),starts_with("FFT"),
+               starts_with("CLASS")) %>% omega
+Vid %>% select(starts_with("PLATO"),starts_with("FFT"),
+               starts_with("CLASS")) %>% fa(6) %>% 
+  print(cut=0.4)
+
+```

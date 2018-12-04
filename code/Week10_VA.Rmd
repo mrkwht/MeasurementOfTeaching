@@ -1,0 +1,248 @@
+---
+title: "Value Added Modeling"
+author: "Mark White"
+date: "December 4, 2018"
+output: 
+  ioslides_presentation:
+     footer: "Copyright (c) 2018, Mark White"
+     transition: faster
+     widescreen: true
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+require(knitr)
+require(lme4)
+require(mice)
+require(kableExtra)
+knitr::opts_chunk$set(echo = FALSE)
+loc <- "C:/Users/mrkwht/Documents/UTQ/VAMS"
+
+Y1 <- read_csv(file.path(loc,"StudentVAMData_Y1.csv")) %>%
+  select(TID=utqid,CID=classid, dist, idc, syear, grdyr, cohort,SID=schoolid, sfrac, subject, 
+         frac_t, iys_tccount, t_iyscount1, 
+         eng, sped, frl, gifted, asian, black, hisp, white, male, 
+         Lang=clang_pztrad_2010, LangSE=clang_pztradsem_2010, 
+         Math=cmath_pztrad_2010, MathSE=cmath_pztradsem_2010, 
+         Read=cread_pztrad_2010, ReadSE=cread_pztradsem_2010, 
+         Sci =cscic_pztrad_2010, SciSE =cscic_pztradsem_2010, 
+         Lang1=clang_pztrad_2009, Lang1SE=clang_pztradsem_2009, 
+         Math1=cmath_pztrad_2009, Math1SE=cmath_pztradsem_2009, 
+         Read1=cread_pztrad_2009, Read1SE=cread_pztradsem_2009, 
+         Sci1 =cscic_pztrad_2009, Sci1SE =cscic_pztradsem_2009, 
+         Lang2=clang_pztrad_2008, Lang2SE=clang_pztradsem_2008, 
+         Math2=cmath_pztrad_2008, Math2SE=cmath_pztradsem_2008, 
+         Read2=cread_pztrad_2008, Read2SE=cread_pztradsem_2008, 
+         Sci2 =cscic_pztrad_2008, Sci2SE =cscic_pztradsem_2008, 
+         Lang3=clang_pztrad_2007, Lang3SE=clang_pztradsem_2007, 
+         Math3=cmath_pztrad_2007, Math3SE=cmath_pztradsem_2007, 
+         Read3=cread_pztrad_2007, Read3SE=cread_pztradsem_2007, 
+         Sci3 =cscic_pztrad_2007, Sci3SE =cscic_pztradsem_2007, 
+         HasTest=fs_cur, HasTest1=fs_lag1, HasTest01=fs_vamable, 
+         PctEng=eng_tpct, PctSPED=sped_tpct, PctFRL=frl_tpct, 
+         PctGift=gifted_tpct, PctA=asian_tpct, PctB=black_tpct,
+         PctH=hisp_tpct, PctW=white_tpct, PctM=male_tpct, 
+         AveLang1=clang_pztrad_2009_tavg, AveMath1=cmath_pztrad_2009_tavg,
+         AveRead1=cread_pztrad_2009_tavg, AveSci1=cscic_pztrad_2009_tavg,
+         AveLang0=clang_pztrad_2010_tavg, AveMath0=cmath_pztrad_2010_tavg,
+         AveRead0=cread_pztrad_2010_tavg, AveSci0=cscic_pztrad_2010_tavg)
+
+Y2 <- read_csv(file.path(loc,"StudentVAMData_Y2.csv")) %>%
+  select(TID=utqid,CID=classid, dist, idc, syear, grdyr, cohort,SID=schoolid, sfrac, subject, 
+         frac_t, iys_tccount, t_iyscount1, 
+         eng, sped, frl, gifted, asian, black, hisp, white, male, 
+         Lang=clang_pztrad_2011, LangSE=clang_pztradsem_2011, 
+         Math=cmath_pztrad_2011, MathSE=cmath_pztradsem_2011, 
+         Read=cread_pztrad_2011, ReadSE=cread_pztradsem_2011, 
+         Sci =cscic_pztrad_2011, SciSE =cscic_pztradsem_2011, 
+         Lang1=clang_pztrad_2010, Lang1SE=clang_pztradsem_2010, 
+         Math1=cmath_pztrad_2010, Math1SE=cmath_pztradsem_2010, 
+         Read1=cread_pztrad_2010, Read1SE=cread_pztradsem_2010, 
+         Sci1 =cscic_pztrad_2010, Sci1SE =cscic_pztradsem_2010, 
+         Lang2=clang_pztrad_2009, Lang2SE=clang_pztradsem_2009, 
+         Math2=cmath_pztrad_2009, Math2SE=cmath_pztradsem_2009, 
+         Read2=cread_pztrad_2009, Read2SE=cread_pztradsem_2009, 
+         Sci2 =cscic_pztrad_2009, Sci2SE =cscic_pztradsem_2009, 
+         Lang3=clang_pztrad_2008, Lang3SE=clang_pztradsem_2008, 
+         Math3=cmath_pztrad_2008, Math3SE=cmath_pztradsem_2008, 
+         Read3=cread_pztrad_2008, Read3SE=cread_pztradsem_2008, 
+         Sci3 =cscic_pztrad_2008, Sci3SE =cscic_pztradsem_2008, 
+         HasTest=fs_cur, HasTest1=fs_lag1, HasTest01=fs_vamable, 
+         PctEng=eng_tpct, PctSPED=sped_tpct, PctFRL=frl_tpct, 
+         PctGift=gifted_tpct, PctA=asian_tpct, PctB=black_tpct, 
+         PctH=hisp_tpct, PctW=white_tpct, PctM=male_tpct, 
+         AveLang1=clang_pztrad_2010_tavg, AveMath1=cmath_pztrad_2010_tavg,
+         AveRead1=cread_pztrad_2010_tavg, AveSci1 =cscic_pztrad_2010_tavg,
+         AveLang0=clang_pztrad_2011_tavg, AveMath0=cmath_pztrad_2011_tavg,
+         AveRead0=cread_pztrad_2011_tavg, AveSci0 =cscic_pztrad_2011_tavg)
+
+dim(Y1)
+dim(Y2)
+dim(dat <- bind_rows(Y1,Y2) %>% 
+      select(-CID) %>% 
+      unique 
+      )
+# rm(Y1,Y2)
+dat <- dat %>% gather(Subj, Out, Lang, Math, Read, Sci) %>%
+  select(-ends_with("SE")) %>%
+  filter(Subj %in% c("Lang","Math")) %>%
+  mutate(Subj=recode(Subj,Lang="Language")) %>%
+  filter(Subj==subject) %>% select(-subject)
+summary(dat)
+# dat %>% count(idc,Subj,syear) %>% filter(n>1)
+# dat %>% filter(idc=="S00001438") %>% as.data.frame
+```
+
+```{r, cache=T, message=F, warning=F, include=F}
+datimp <- mice::mice(dat , m=1, maxit=5, meth="pmm",seed=1)
+dat <- complete(datimp)
+```
+
+```{r models, cache=T, include=F, message=F, warning=F}
+mod <- lmer(Out~1+(0+frac_t|TID)+(1|idc)+(0+sfrac|SID:Subj)+(0+sfrac|SID)+(0+sfrac|SID:grdyr),dat)
+# summary(mod)
+# VarPer(mod)
+
+mod2 <- update(mod, .~.+Lang1+Math1+Lang2+Math2+Read1+Sci1+Read2+Sci2)
+mod3 <- update(mod, .~.+eng+sped+frl+gifted+asian+black+hisp+male+Lang1+Math1+Lang2+Math2+Read1+Sci1+Read2+Sci2)
+```
+
+```{r modFRL, cache=T, include=F}
+modFRL <- lmer(Out~1+(0+frac_t|TID)+(1|idc)+(0+sfrac|SID:Subj)+(0+sfrac|SID)+(0+sfrac|SID:grdyr),
+               dat, subset=frl==1)
+modNFRL <- lmer(Out~1+(0+frac_t|TID)+(1|idc)+(0+sfrac|SID:Subj)+(0+sfrac|SID)+(0+sfrac|SID:grdyr),
+               dat, subset=frl==0)
+MathT <- dat %>% count(TID,I(Math1<0)) %>% filter(n>5) %>% .$TID %>% unique
+# modLang <- lmer(Out~1+(0+I((Lang1<0)*frac_t)+I((Lang1>=0)*frac_t)|TID)+
+#                  (1|idc)+(0+sfrac|SID:Subj)+(0+sfrac|SID)+(0+sfrac|SID:grdyr),
+#                 dat, subset=TID %in% MathT)
+# MathT <- dat %>% count(TID,I(Math1<0)) %>% filter(n>5) %>% .$TID %>% unique
+# modMath <- lmer(Out~1+(0+I((Math1<0)*frac_t)+I((Math1>=0)*frac_t)|TID)+
+#                  (1|idc)+(0+sfrac|SID:Subj)+(0+sfrac|SID)+(0+sfrac|SID:grdyr),
+#                 dat, subset=TID %in% MathT)
+```
+
+## Introduction to Value-Added Models
+
+- Very Brief History
+- Why Value-Added (VA)
+- VA Conceptual Assumptions
+- Evidence on VA Assumptions
+
+## Not Covered
+
+- Statisical Models
+- Details on statistical models/intricacies
+
+
+## Very Brief History {.smaller }
+
+- Process-Product/school effects research used gain scores to look at teacher effects
+    - Generally found large classroom/teacher effects
+- Growth in minimum competency testing and later proficiency testing made scores available
+    - TN analyses statewide found teacher as most important contributor (Sanders and Rivers)
+- Led to policy interest in measuring teacher quality using test scores
+
+## UTQ Data - Pct Variances {.smaller}
+
+```{r}
+data.frame(Unconditional=VarPer(mod), 
+           PriorTestCtrl=VarPer(mod2),
+           FullCtrl=VarPer(mod3) ) %>% 
+  rownames_to_column %>% 
+  mutate(rowname=recode(rowname, idc="Student", TID="Teacher", `SID:grdyr`="SchoolByGrade", `SID:Subj`="SchoolBySubj", `SID`="School")) %>%
+  kable %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F)
+```
+
+## Why Value-Added (VA)
+
+- Desire for "objective" measure of teacher quality
+    - Test scores as natural metric in proficiency based system
+    - Test scores make it cheap to estimate
+- Desire for outcome measure of schools
+- Policy relevance of test scores in current regimes
+    - Teachers are important source of differences in scores
+
+## Defining VA as a Construct
+
+What are the assumptions being made by VA scores? What construct is being measured?
+
+- Students are taught by teachers in schools 
+- Students learn many subjects, sometimes from many teachers
+- VA score are estimated as a single number conditional on known student characteristics from previous years
+
+## VA as Causal Model
+
+- Potential Outcomes Framework
+    - Each student has potential outcome if they are taught by each teacher
+    - Observed outcomes are non-random subset
+- Assumptions (all conditional on covariates)
+    - Outcomes are missing at random (missingness independent of value)
+    - Students have single potential outcome in each classroom (SUTVA)
+    - See Reardon and Raudenbush, 2009
+    
+## UTQ Data {.smaller #Tabup}
+
+<style> 
+  #Tabup  { 
+    margin-top: -40px; 
+  } 
+</style>
+
+```{r}
+coef(summary(mod3)) %>% kable %>%
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = F)
+```
+
+## VA Assumptions - Stability {.smaller}
+
+- Newton, et al., 2010 - correlations 0.43-0.63 across years in Math and 0.34-0.48 in ELA
+- Papay, 2011 - 0.57-0.71
+- Goldhaber & Hansen, 2010 - 0.32, 0.55 in ELA/Math
+
+## VA Assumptions - Affected by SES {.smaller}
+
+- Newton, et al., 2010 - VA scores are generally correlated with student characteristics and incoming student achievement. Teachers receive higher scores in high track versus low track courses
+- Loeb, et al., 2014 - correlations of across ELL/non-ELL is 0.6
+- Fox 2015 - highly stable VA scores across subgroups (cor>0.9)
+
+## UTQ Data - Subgroups 
+
+```{r UTQsub, cache=T}
+fn <- Out~1+(0+frac_t|TID)+(1|idc)+(0+sfrac|SID:Subj)+(0+sfrac|SID)+(0+sfrac|SID:grdyr)
+tbl<-data.frame(LowMath=VarPer(lmer(fn,dat, subset=Math1<=mean(Math1))), 
+                HiMath =VarPer(lmer(fn,dat, subset=Math1>=mean(Math1))),
+                LowLang=VarPer(lmer(fn,dat, subset=Lang1<=mean(Lang1))),
+                HiLang =VarPer(lmer(fn,dat, subset=Lang1>=mean(Lang1))),
+                FRL    =VarPer(modFRL),
+                NonFRL =VarPer(modNFRL) 
+                )
+tbl %>% 
+  rownames_to_column %>% 
+  mutate(rowname=recode(rowname, idc="Student", TID="Teacher", `SID:grdyr`="SchoolByGrade", `SID:Subj`="SchoolBySubj", `SID`="School")) %>%
+  kable %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F)
+```
+
+
+
+## VA Assumptions - Dependence on Test {.smaller}
+
+- Lockwood, et al., 2007 - correlation of VA scores across equivalent tests is 0.32-0.4
+- Papay 2011 - correlations across tests 0.15-0.58
+- Fox 2015 - correlations across subject 0.7
+
+## VA Assumptions - Generalizing Across Schools {.smaller}
+
+- Angrist, et al 2017 - Lottery randomization used to show VA scores are biased across schools
+- Raudenbush 2013 - more theoretical but argues VA scores cannot generalize across different contexts
+
+## Take-aways {.smaller}
+
+- VA scores seem to be useful, but they are full of error
+    - Randomization experiments suggest little within-school error, but potentially large between school error, especially when schools differ widely on student characteristics
+- Averaging scores across 3+ years makes them more stable
+    - Scores can then be used to identify teacher quality, but mostly in the tails
+- VA scores are only available for some teachers and for fewer if aggregating over years
+- Provide little opportunity for guidance for teachers
